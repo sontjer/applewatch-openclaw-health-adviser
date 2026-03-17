@@ -16,6 +16,30 @@
 
 ---
 
+## ⚡ 0. 5分钟快速启动
+
+1. 准备私有数据仓（例如 `data_sync_analysis`）和 iOS Auto Export（JSON + POST + `X-Auth-Key`）。
+2. 在 `cloudflare_worker/wrangler.toml` 填 `GITHUB_OWNER/GITHUB_REPO`，并设置 secrets：
+   - `INGEST_KEY`
+   - `GITHUB_TOKEN`
+3. `wrangler deploy` 后拿到 URL（或绑定自定义域）。
+4. 在 Agent 主机配置 `/root/.health_pipeline.env`（仓库、PAT、Telegram）。
+5. 执行：
+
+```bash
+set -a; source /root/.health_pipeline.env; set +a
+/root/applewatch-openclaw-health-adviser/openclaw_agent/pull_and_score.sh
+```
+
+6. 验收：确认生成 `data/report/*.json|*.md` 且 Telegram 收到报告。
+
+### 快速入口
+
+- 运行手册（部署/验收/排障）：[`docs/runbook.md`](docs/runbook.md)
+- 常见问题（错误码/修复）：[`docs/faq.md`](docs/faq.md)
+
+---
+
 ## 1. 架构总览
 
 ```mermaid
