@@ -447,6 +447,10 @@ def main() -> None:
     # Diet + cross analysis
     diet_map = parse_diet(repo)
     today_diet = diet_map.get(date_key)
+    if not today_diet and diet_map:
+        # Fallback to the most recent logged diet day when sleep-date bucket has no meal records.
+        latest_d = sorted(diet_map.keys())[-1]
+        today_diet = diet_map.get(latest_d)
     corr_x, corr_y = [], []
     for x in history[-30:]:
         d = x.get('date')

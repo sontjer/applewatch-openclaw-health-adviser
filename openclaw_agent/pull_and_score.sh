@@ -32,9 +32,15 @@ if [ ! -f "$REPO_DIR/data/latest.json" ]; then
   exit 0
 fi
 
-python3 "$SCRIPT_DIR/analyze_latest.py" \
+if ! python3 "$SCRIPT_DIR/analyze_latest.py" \
   --input "$REPO_DIR/data/latest.json" \
-  --output "$REPO_DIR/data/report/latest_score.json"
+  --output "$REPO_DIR/data/report/latest_score.json"; then
+  echo "analyze_latest failed; fallback to previous latest_score.json if present."
+  if [ ! -f "$REPO_DIR/data/report/latest_score.json" ]; then
+    echo "no previous latest_score.json, stop."
+    exit 0
+  fi
+fi
 
 python3 "$SCRIPT_DIR/generate_health_report.py" \
   --repo-dir "$REPO_DIR"
