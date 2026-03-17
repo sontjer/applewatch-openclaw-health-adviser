@@ -108,6 +108,11 @@ def main() -> None:
         lines.append(row("脂肪", f"{fmt(diet.get('fat_g'),1,' g')}" ))
         lines.append("</pre>")
         lines.append(f"• 评价: {esc(eval_text if eval_text else 'N/A')}")
+    else:
+        lines.append("")
+        lines.append("🍽️ <b>饮食分析（当日）</b>")
+        lines.append("• 当日摄入: 暂无")
+        lines.append("• 评价: 暂无")
 
     if alerts:
         lines.append("")

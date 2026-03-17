@@ -548,7 +548,8 @@ def main() -> None:
         lines.append(f"- 当日摄入：热量 `{fmt(nutrition_eval['calories'],0,' kcal')}`，蛋白 `{fmt(nutrition_eval['protein_g'],1,' g')}`，碳水 `{fmt(nutrition_eval['carbs_g'],1,' g')}`，脂肪 `{fmt(nutrition_eval['fat_g'],1,' g')}`")
         lines.append(f"- 营养评价：{'；'.join(nutrition_eval['evaluation'])}")
     else:
-        lines.append('- 未检测到可用饮食数据，已跳过营养评价。')
+        lines.append('- 当日摄入：暂无')
+        lines.append('- 营养评价：暂无')
     lines.append(f"- 近30天热量 vs 睡眠评分相关系数：`{fmt(cal_sleep_corr,2)}`（样本天数 `{len(corr_x)}`）")
     lines.append('')
     lines.append('## 执行建议')
