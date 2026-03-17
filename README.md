@@ -200,6 +200,27 @@ set -a; source /root/.health_pipeline.env; set +a
 - `data/diet/meal_text_log.csv`
 - 会自动估算热量/蛋白/碳水/脂肪，输出 `meal_text_estimated.csv`
 
+#### OpenClaw 自然语言录入示例
+
+在 OpenClaw 对话里可以用自然语言记录餐饮（由 Agent 落盘到 `meal_text_log.csv`）：
+
+```text
+今天中午吃了芹菜金针菇蛋汤、青椒牛柳、红烧鲫鱼、炒生菜、一小碗米饭
+```
+
+对应落盘格式：
+
+```csv
+timestamp,meal,description
+2026-03-17 12:30:00,lunch,芹菜金针菇蛋汤、青椒牛柳、红烧鲫鱼、炒生菜、一小碗米饭
+```
+
+然后在下一次 `pull_and_score.sh` 执行时自动完成：
+
+1. 菜品识别与营养估算（热量/蛋白/碳水/脂肪）
+2. 当日营养合理度评价（够不够、过不过）
+3. 纳入“饮食 × 睡眠”交叉分析与趋势报告
+
 并自动做：
 
 - 当日营养搭配合理度评估
