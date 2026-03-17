@@ -1,4 +1,4 @@
-# Apple Watch + OpenClaw Health Pipeline
+# Apple Watch + OpenClaw Health Adviser
 
 ## 🚨 显眼包：Telegram 最终报告效果
 
