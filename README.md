@@ -221,6 +221,33 @@ timestamp,meal,description
 2. 当日营养合理度评价（够不够、过不过）
 3. 纳入“饮食 × 睡眠”交叉分析与趋势报告
 
+#### 推荐触发方式（固定短句）
+
+建议在 OpenClaw 中统一使用前缀触发，降低歧义：
+
+```text
+记饮食：今天中午吃了芹菜金针菇蛋汤、青椒牛柳、红烧鲫鱼、炒生菜、一小碗米饭
+```
+
+Agent 处理约定：
+
+1. 去掉前缀 `记饮食：`
+2. 调用 `meal-intake-log` skill 落盘
+3. 可选立即触发一次 `pull_and_score.sh`（即时更新 Telegram 报告）
+
+Skill 命令（服务器）：
+
+```bash
+python3 /root/codex/skills/meal-intake-log/scripts/log_meal_text.py \
+  --repo-dir /root/.openclaw/workspace/health-data \
+  --text "今天中午吃了芹菜金针菇蛋汤、青椒牛柳、红烧鲫鱼、炒生菜、一小碗米饭"
+```
+
+支持参数：
+
+- `--timestamp \"YYYY-mm-dd HH:MM:SS\"`（补录历史）
+- `--meal breakfast|lunch|dinner|snack|unspecified`（覆盖自动识别）
+
 并自动做：
 
 - 当日营养搭配合理度评估
