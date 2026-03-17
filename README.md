@@ -123,7 +123,7 @@ wrangler deploy
 
 将本仓 `openclaw_agent/` 放到主机，例如：
 
-- `/root/applewatch-openclaw-health-pipeline/openclaw_agent`
+- `/root/applewatch-openclaw-health-adviser/openclaw_agent`
 
 准备环境变量文件 `/root/.health_pipeline.env`：
 
@@ -148,7 +148,7 @@ chmod 600 /root/.health_pipeline.env
 
 ```bash
 set -a; source /root/.health_pipeline.env; set +a
-/root/applewatch-openclaw-health-pipeline/openclaw_agent/pull_and_score.sh
+/root/applewatch-openclaw-health-adviser/openclaw_agent/pull_and_score.sh
 ```
 
 成功标志：
@@ -163,7 +163,7 @@ set -a; source /root/.health_pipeline.env; set +a
 示例：每天 08:18
 
 ```cron
-18 8 * * * . /root/.health_pipeline.env; /root/applewatch-openclaw-health-pipeline/openclaw_agent/pull_and_score.sh >> /tmp/health_pipeline.log 2>&1 # health-pipeline
+18 8 * * * . /root/.health_pipeline.env; /root/applewatch-openclaw-health-adviser/openclaw_agent/pull_and_score.sh >> /tmp/health_pipeline.log 2>&1 # health-pipeline
 ```
 
 ---
@@ -261,7 +261,7 @@ set -a; source /root/.health_pipeline.env; set +a
 ## 11. 一句话执行命令（主机）
 
 ```bash
-set -a; source /root/.health_pipeline.env; set +a; /root/applewatch-openclaw-health-pipeline/openclaw_agent/pull_and_score.sh
+set -a; source /root/.health_pipeline.env; set +a; /root/applewatch-openclaw-health-adviser/openclaw_agent/pull_and_score.sh
 ```
 
 ---
