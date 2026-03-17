@@ -3,6 +3,7 @@
 ## 🚨 最终报告效果
 
 ![Telegram收到最终报告效果](docs/images/telegram-final-report.png)
+![健康报告效果图2](docs/images/health-record2.jpg)
 
 从零搭建一条可运行的健康数据闭环：
 
