@@ -245,6 +245,12 @@ timestamp,meal,description
 - `daily_health_report.md`
 4) Telegram 收到分列式报告（含 emoji）
 
+### Telegram 最终报告效果
+
+> Telegram收到最终报告效果
+
+![Telegram收到最终报告效果](docs/images/telegram-final-report.png)
+
 ---
 
 ## 9. 常见问题与修复
