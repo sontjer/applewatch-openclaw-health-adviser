@@ -1,6 +1,6 @@
 # Apple Watch + OpenClaw Health Adviser
 
-## 🚨 显眼包：最终报告效果
+## 🚨 最终报告效果
 
 ![Telegram收到最终报告效果](docs/images/telegram-final-report.png)
 
