@@ -64,9 +64,11 @@ def main() -> None:
     recs = ins.get('recommendations', [])
     trend = ins.get('trend', {})
     m = ins.get('core_metrics', {})
+    activity = ins.get('activity_summary', {})
     diet = ins.get('diet_sleep_cross', {}).get('today_nutrition')
     corr = ins.get('diet_sleep_cross', {}).get('calories_vs_sleep_score_corr')
     both_days = ins.get('diet_sleep_cross', {}).get('days_with_both_data')
+    rec_dim = ins.get('recommendations_by_dimension', {})
 
     lines = []
     lines.append("📊 <b>健康分析报告</b>")
@@ -89,6 +91,15 @@ def main() -> None:
     lines.append(row("深度睡眠", f"{fmt(m.get('sleep_deep_h'),2,' h')}" ))
     lines.append(row("REM眼动", f"{fmt(m.get('sleep_rem_h'),2,' h')}" ))
     lines.append(row("清醒时长", f"{fmt(m.get('sleep_awake_h'),2,' h')}" ))
+    lines.append("</pre>")
+    lines.append("")
+    lines.append("🏃 <b>运动情况</b>")
+    lines.append("<pre>")
+    lines.append(row("步数(日均)", f"{fmt(activity.get('steps_avg'),0,' 步')}"))
+    lines.append(row("运动时长", f"{fmt(activity.get('exercise_min_avg'),1,' 分钟')}"))
+    lines.append(row("活动能量", f"{fmt(activity.get('active_kcal_avg'),1,' kcal')}"))
+    lines.append(row("爬楼层数", f"{fmt(activity.get('flights_avg'),1,' 层')}"))
+    lines.append(row("步跑距离", f"{fmt(activity.get('distance_km_avg'),2,' km')}"))
     lines.append("</pre>")
     lines.append("")
     lines.append("📈 <b>趋势</b>")
@@ -119,7 +130,17 @@ def main() -> None:
         lines.append("🚨 <b>自动告警</b>")
         for a in alerts[:3]:
             lines.append(f"• {esc(a)}")
-    if recs:
+    if rec_dim:
+        lines.append("")
+        lines.append("🧭 <b>执行建议</b>")
+        for dim in ("摄入", "作息", "运动"):
+            items = rec_dim.get(dim) or []
+            if not items:
+                continue
+            lines.append(f"• <b>{dim}</b>")
+            for r in items[:3]:
+                lines.append(f"  - {esc(r)}")
+    elif recs:
         lines.append("")
         lines.append("🧭 <b>执行建议</b>")
         for r in recs[:4]:

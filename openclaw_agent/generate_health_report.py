@@ -177,6 +177,35 @@ def summarize_sleep(series: List[Dict[str, Any]]) -> Dict[str, Optional[float]]:
     }
 
 
+def summarize_activity(
+    step_series: List[Dict[str, Any]],
+    exercise_series: List[Dict[str, Any]],
+    active_energy_series: List[Dict[str, Any]],
+    flights_series: List[Dict[str, Any]],
+    distance_series: List[Dict[str, Any]],
+) -> Dict[str, Optional[float]]:
+    steps = [to_float(r.get('qty') or r.get('value')) for r in step_series]
+    steps = [x for x in steps if x is not None]
+    exercise_min = [to_float(r.get('qty') or r.get('value')) for r in exercise_series]
+    exercise_min = [x for x in exercise_min if x is not None]
+    active_kj = [to_float(r.get('qty') or r.get('value')) for r in active_energy_series]
+    active_kj = [x for x in active_kj if x is not None]
+    flights = [to_float(r.get('qty') or r.get('value')) for r in flights_series]
+    flights = [x for x in flights if x is not None]
+    distance_km = [to_float(r.get('qty') or r.get('value')) for r in distance_series]
+    distance_km = [x for x in distance_km if x is not None]
+
+    # kJ -> kcal
+    active_kcal = [x / 4.184 for x in active_kj]
+    return {
+        'steps_avg': avg(steps),
+        'exercise_min_avg': avg(exercise_min),
+        'active_kcal_avg': avg(active_kcal),
+        'flights_avg': avg(flights),
+        'distance_km_avg': avg(distance_km),
+    }
+
+
 FOOD_DB = {
     '米饭': (220, 4, 50, 0.5),
     '小碗米饭': (160, 3, 36, 0.4),
@@ -294,36 +323,54 @@ def parse_diet(repo_dir: Path) -> Dict[str, Dict[str, float]]:
     return out
 
 
-def recommend(metrics: Dict[str, Optional[float]], score: Dict[str, Any], diet_day: Optional[Dict[str, float]]) -> List[str]:
-    rec = []
+def recommend_by_dimension(
+    metrics: Dict[str, Optional[float]],
+    activity: Dict[str, Optional[float]],
+    score: Dict[str, Any],
+    diet_day: Optional[Dict[str, float]],
+) -> Dict[str, List[str]]:
+    rec = {'摄入': [], '作息': [], '运动': []}
 
-    if metrics.get('sleep_total_h') is not None and metrics['sleep_total_h'] < 7:
-        rec.append('未来7天把就寝时间前移20-30分钟，目标睡眠总时长稳定在 7-8.5 小时。')
-
-    if metrics.get('sleep_deep_h') is not None and metrics['sleep_deep_h'] < 1.0:
-        rec.append('深睡偏低：晚餐后减少酒精和重油，睡前90分钟避免高强度运动与强光屏幕。')
-
-    if metrics.get('rhr_avg') is not None and metrics['rhr_avg'] >= 70:
-        rec.append('静息心率偏高：本周以中低强度有氧为主，避免连续高强度训练。')
-
-    if metrics.get('spo2_avg_pct') is not None and metrics['spo2_avg_pct'] < 95:
-        rec.append('血氧平均偏低，建议关注鼻塞/打鼾等问题；若持续偏低请就医评估。')
-
-    if score.get('details', {}).get('timing') is not None and score['details']['timing'] < 60:
-        rec.append('节律时序偏移：连续7天固定起床时间（周末差异<1小时），优先修复生物钟。')
-
+    # 摄入
     if diet_day:
         cal = diet_day.get('calories', 0)
         p = diet_day.get('protein_g', 0)
+        c = diet_day.get('carbs_g', 0)
         if cal < 1400:
-            rec.append('当日热量摄入可能偏低，注意避免长期能量不足导致恢复变差。')
-        if cal > 2600:
-            rec.append('当日热量偏高，建议晚餐减少精制碳水并增加蔬菜占比。')
+            rec['摄入'].append('当日热量偏低，建议加一份主食或优质脂肪，避免恢复不足。')
+        elif cal > 2600:
+            rec['摄入'].append('当日热量偏高，晚餐主食减量并控制烹调油。')
         if p < 60:
-            rec.append('蛋白质摄入偏低，建议每餐补充优质蛋白（鱼/蛋/瘦肉/豆制品）。')
+            rec['摄入'].append('蛋白偏低，建议每餐补充鱼/蛋/瘦肉/豆制品，目标≥60g/日。')
+        if c < 130:
+            rec['摄入'].append('碳水偏低，若有训练建议补充全谷物和薯类。')
+    else:
+        rec['摄入'].append('今日未记录摄入，建议至少记录主餐以启用营养针对性建议。')
 
-    if not rec:
-        rec.append('保持当前节律：固定起床时间 + 晚间控光 + 每周3-4次中等强度运动。')
+    # 作息
+    if metrics.get('sleep_total_h') is not None and metrics['sleep_total_h'] < 7:
+        rec['作息'].append('睡眠时长不足，未来7天将入睡时间前移20-30分钟，目标7-8.5小时。')
+    if metrics.get('sleep_deep_h') is not None and metrics['sleep_deep_h'] < 1.0:
+        rec['作息'].append('深睡偏低：睡前90分钟避免强光与高强度运动，晚餐减少酒精重油。')
+    if score.get('details', {}).get('timing') is not None and score['details']['timing'] < 60:
+        rec['作息'].append('节律偏移：固定起床时间（含周末），将周末作息差控制在1小时内。')
+    if metrics.get('spo2_avg_pct') is not None and metrics['spo2_avg_pct'] < 95:
+        rec['作息'].append('血氧偏低，关注鼻塞/打鼾；若持续偏低建议做睡眠医学评估。')
+
+    # 运动
+    if activity.get('exercise_min_avg') is not None and activity['exercise_min_avg'] < 30:
+        rec['运动'].append('运动时长偏低：每周至少150分钟中等强度有氧，可拆分为每日30分钟。')
+    if activity.get('steps_avg') is not None and activity['steps_avg'] < 7000:
+        rec['运动'].append('步数偏低：建议日均步数提升到7000-10000步。')
+    if metrics.get('rhr_avg') is not None and metrics['rhr_avg'] >= 70:
+        rec['运动'].append('静息心率偏高：优先中低强度有氧+规律力量训练，避免连续高强度冲刺。')
+    if activity.get('active_kcal_avg') is not None and activity['active_kcal_avg'] < 300:
+        rec['运动'].append('活动能量偏低：增加通勤步行、爬楼或晚间快走，提升日常活动消耗。')
+
+    # defaults
+    for k in rec:
+        if not rec[k]:
+            rec[k].append('当前维度整体表现可接受，按现有节奏持续并每周复盘一次。')
     return rec
 
 
@@ -357,6 +404,11 @@ def main() -> None:
     spo2_series = select_recent(parse_metric_series(metrics_map.get('oxygenSaturation')), 30, now)
     temp_series = select_recent(parse_metric_series(metrics_map.get('appleSleepingWristTemperature')), 30, now)
     sleep_series = select_recent(parse_metric_series(metrics_map.get('sleepAnalysis')), 30, now)
+    step_series = select_recent(parse_metric_series(metrics_map.get('stepCount')), 30, now)
+    exercise_series = select_recent(parse_metric_series(metrics_map.get('appleExerciseTime')), 30, now)
+    active_energy_series = select_recent(parse_metric_series(metrics_map.get('activeEnergyBurned')), 30, now)
+    flights_series = select_recent(parse_metric_series(metrics_map.get('flightsClimbed')), 30, now)
+    distance_series = select_recent(parse_metric_series(metrics_map.get('walkingRunningDistance')), 30, now)
 
     hr_sum = summarize_heart_rate(hr_series)
     rhr_vals = [to_float(r.get('qty') or r.get('value')) for r in rhr_series]
@@ -371,10 +423,11 @@ def main() -> None:
     temp_vals = [x for x in temp_vals if x is not None]
 
     sleep_sum = summarize_sleep(sleep_series)
+    activity_sum = summarize_activity(step_series, exercise_series, active_energy_series, flights_series, distance_series)
 
     # Determine period info
     all_dates: List[datetime] = []
-    for series in (hr_series, rhr_series, spo2_series, temp_series, sleep_series):
+    for series in (hr_series, rhr_series, spo2_series, temp_series, sleep_series, step_series, exercise_series, active_energy_series):
         all_dates.extend(metric_dates(series))
     if all_dates:
         dmin, dmax = min(all_dates), max(all_dates)
@@ -484,7 +537,8 @@ def main() -> None:
             'evaluation': adequacy,
         }
 
-    recs = recommend(metric_summary, score, today_diet)
+    recs_by_dim = recommend_by_dimension(metric_summary, activity_sum, score, today_diet)
+    recs = [f"[{k}] {item}" for k in ('摄入', '作息', '运动') for item in recs_by_dim[k]]
 
     insights = {
         'generated_at': datetime.utcnow().isoformat() + 'Z',
@@ -510,6 +564,8 @@ def main() -> None:
             'today_nutrition': nutrition_eval,
             'note': '相关系数仅用于趋势观察，不用于医学诊断。',
         },
+        'activity_summary': activity_sum,
+        'recommendations_by_dimension': recs_by_dim,
         'recommendations': recs,
     }
 
@@ -543,6 +599,13 @@ def main() -> None:
     lines.append(f"- REM 眼动：`{fmt(m['sleep_rem_h'],2,' h')}`")
     lines.append(f"- 清醒时长：`{fmt(m['sleep_awake_h'],2,' h')}`")
     lines.append('')
+    lines.append('## 运动情况')
+    lines.append(f"- 步数（日均）：`{fmt(activity_sum['steps_avg'],0,' 步')}`")
+    lines.append(f"- 运动时长（日均）：`{fmt(activity_sum['exercise_min_avg'],1,' 分钟')}`")
+    lines.append(f"- 活动能量（日均）：`{fmt(activity_sum['active_kcal_avg'],1,' kcal')}`")
+    lines.append(f"- 爬楼层数（日均）：`{fmt(activity_sum['flights_avg'],1,' 层')}`")
+    lines.append(f"- 步行/跑步距离（日均）：`{fmt(activity_sum['distance_km_avg'],2,' km')}`")
+    lines.append('')
     lines.append('## 饮食与睡眠交叉分析')
     if nutrition_eval:
         lines.append(f"- 当日摄入：热量 `{fmt(nutrition_eval['calories'],0,' kcal')}`，蛋白 `{fmt(nutrition_eval['protein_g'],1,' g')}`，碳水 `{fmt(nutrition_eval['carbs_g'],1,' g')}`，脂肪 `{fmt(nutrition_eval['fat_g'],1,' g')}`")
@@ -553,7 +616,14 @@ def main() -> None:
     lines.append(f"- 近30天热量 vs 睡眠评分相关系数：`{fmt(cal_sleep_corr,2)}`（样本天数 `{len(corr_x)}`）")
     lines.append('')
     lines.append('## 执行建议')
-    for r in recs:
+    lines.append('### 摄入')
+    for r in recs_by_dim['摄入']:
+        lines.append(f"- {r}")
+    lines.append('### 作息')
+    for r in recs_by_dim['作息']:
+        lines.append(f"- {r}")
+    lines.append('### 运动')
+    for r in recs_by_dim['运动']:
         lines.append(f"- {r}")
 
     out_md.write_text('\n'.join(lines) + '\n', encoding='utf-8')
