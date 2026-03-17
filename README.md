@@ -264,6 +264,12 @@ set -a; source /root/.health_pipeline.env; set +a
 set -a; source /root/.health_pipeline.env; set +a; /root/applewatch-openclaw-health-adviser/openclaw_agent/pull_and_score.sh
 ```
 
+查看最新一次评分时间戳与分数（避免手写内联 Python）：
+
+```bash
+python3 /root/applewatch-openclaw-health-adviser/openclaw_agent/print_latest_score.py --repo-dir /root/.openclaw/workspace/health-data
+```
+
 ---
 
 ## 12. 许可证
