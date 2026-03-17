@@ -1,5 +1,9 @@
 # Apple Watch + OpenClaw Health Pipeline
 
+## 🚨 显眼包：Telegram 最终报告效果
+
+![Telegram收到最终报告效果](docs/images/telegram-final-report.png)
+
 从零搭建一条可运行的健康数据闭环：
 
 - iOS `Health Auto Export` 自动导出 JSON
