@@ -1,0 +1,18 @@
+name = "apple-health-ingest"
+main = "index.js"
+compatibility_date = "2026-03-17"
+workers_dev = true
+
+[observability]
+enabled = true
+
+[vars]
+GITHUB_OWNER = "<your-github-user-or-org>"
+GITHUB_REPO = "<your-data-repo>"
+GITHUB_BRANCH = "main"
+METRIC_WHITELIST = "heartRateVariabilitySDNN,oxygenSaturation,restingHeartRate,respiratoryRate,appleSleepingWristTemperature,heartRate,stepCount,activeEnergyBurned,basalEnergyBurned,appleExerciseTime,flightsClimbed,vo2Max,sleepAnalysis,environmentalAudioExposure,appleStandHour"
+MAX_REQ_BYTES = "8000000"
+
+# set with:
+# wrangler secret put INGEST_KEY
+# wrangler secret put GITHUB_TOKEN

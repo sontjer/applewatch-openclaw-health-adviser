@@ -1,0 +1,4 @@
+timestamp,meal,calories,protein_g,carbs_g,fat_g,note
+2026-03-17 08:30:00,breakfast,420,25,50,14,oats+eggs
+2026-03-17 12:30:00,lunch,680,38,72,24,rice+chicken
+2026-03-17 19:00:00,dinner,590,35,65,20,fish+vegetables
