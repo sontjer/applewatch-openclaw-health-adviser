@@ -74,12 +74,13 @@ def main() -> None:
     trend = ins.get('trend', {})
     m = ins.get('core_metrics', {})
     activity = ins.get('activity_summary', {})
+    workout = ins.get('workout_summary', {})
     diet = ins.get('diet_sleep_cross', {}).get('today_nutrition')
+    today_meals = ins.get('diet_sleep_cross', {}).get('today_meals') or []
     corr = ins.get('diet_sleep_cross', {}).get('calories_vs_sleep_score_corr')
     both_days = ins.get('diet_sleep_cross', {}).get('days_with_both_data')
     rec_dim = ins.get('recommendations_by_dimension', {})
     dq = ins.get('data_quality', {})
-    score_meta = ins.get('score_meta', {})
 
     min_cov = float(os.environ.get('HEALTH_DAILY_MIN_COVERAGE_PCT', '80').strip() or '80')
     cov = dq.get('required_metric_coverage_pct')
@@ -88,9 +89,6 @@ def main() -> None:
         is_incomplete = (cov is None) or (float(cov) < min_cov)
     except Exception:
         is_incomplete = True
-    score_source = score_meta.get('score_source', 'unknown')
-    freshness = score_meta.get('data_freshness_minutes')
-    fb_count = score_meta.get('consecutive_fallback_count')
 
     lines = []
     title = "⚠️ <b>健康分析报告（草稿：数据不完整）</b>" if is_incomplete else "📊 <b>健康分析报告</b>"
@@ -100,7 +98,6 @@ def main() -> None:
     lines.append(f"🧩 数据完整度: {esc(fmt(dq.get('required_metric_coverage_pct'),1,' %'))}（{esc(dq.get('required_present'))}/{esc(dq.get('required_total'))}）")
     if is_incomplete:
         lines.append(f"🚧 发布门槛: 覆盖率低于 {esc(fmt(min_cov,1,' %'))}，本次按草稿推送")
-    lines.append(f"🧪 评分来源: {esc(score_source)}，数据新鲜度: {esc(fmt(freshness,1,' 分钟'))}，连续fallback: {esc(fb_count)}")
     lines.append("")
     lines.append("🫀 <b>核心身体指标</b>")
     lines.append("<pre>")
@@ -128,13 +125,26 @@ def main() -> None:
     lines.append(row("爬楼层数", f"{fmt(activity.get('flights_avg'),1,' 层')}"))
     lines.append(row("步跑距离", f"{fmt(activity.get('distance_km_avg'),2,' km')}"))
     lines.append("</pre>")
-    lines.append("")
-    lines.append("📈 <b>趋势</b>")
-    lines.append(f"• 近7天均分: {esc(fmt(trend.get('week_avg'),1))}（较前7天 {esc(fmt(trend.get('week_delta'),1))}）")
-    lines.append(f"• 近30天均分: {esc(fmt(trend.get('month_avg'),1))}（较前30天 {esc(fmt(trend.get('month_delta'),1))}）")
-    if both_days is not None:
-        lines.append(f"• 饮食×睡眠样本天数: {esc(both_days)}，热量-评分相关: {esc(fmt(corr,2))}")
-
+    if workout:
+        wt = workout.get('today') or {}
+        w7 = workout.get('avg_7d') or {}
+        w30 = workout.get('avg_30d') or {}
+        lines.append("🏋️ <b>训练类型（近30天）</b>")
+        lines.append("<pre>")
+        lines.append(row("当日时长", f"{fmt(wt.get('duration_min'),1,' 分钟')}"))
+        lines.append(row("当日里程", f"{fmt(wt.get('distance_km'),2,' km')}"))
+        lines.append(row("当日配速", f"{fmt(wt.get('pace_min_per_km'),2,' min/km')}"))
+        lines.append(row("当日均心率", f"{fmt(wt.get('avg_hr_bpm'),1,' bpm')}"))
+        lines.append(row("7天时长均值", f"{fmt(w7.get('duration_min_avg'),1,' 分钟')}"))
+        lines.append(row("30天时长均值", f"{fmt(w30.get('duration_min_avg'),1,' 分钟')}"))
+        lines.append("</pre>")
+        for x in (wt.get('types') or [])[:4]:
+            lines.append(
+                f"• {esc(x.get('type'))}: "
+                f"{esc(fmt(x.get('duration_min'),1,'分钟'))}, "
+                f"{esc(fmt(x.get('distance_km'),2,'km'))}, "
+                f"{esc(fmt(x.get('pace_min_per_km'),2,'min/km'))}"
+            )
     if diet:
         eval_text = '；'.join(diet.get('evaluation', []))
         lines.append("")
@@ -146,11 +156,30 @@ def main() -> None:
         lines.append(row("脂肪", f"{fmt(diet.get('fat_g'),1,' g')}" ))
         lines.append("</pre>")
         lines.append(f"• 评价: {esc(eval_text if eval_text else 'N/A')}")
+        if today_meals:
+            lines.append("• 三餐明细:")
+            for x in today_meals[:3]:
+                lines.append(
+                    "  - "
+                    + esc(str(x.get('meal') or 'meal'))
+                    + ": "
+                    + esc(str(x.get('description') or ''))
+                )
     else:
         lines.append("")
         lines.append("🍽️ <b>饮食分析（当日）</b>")
         lines.append("• 当日摄入: 暂无")
         lines.append("• 评价: 暂无")
+
+    lines.append("")
+    lines.append("📈 <b>趋势</b>")
+    lines.append(f"• 近7天均分: {esc(fmt(trend.get('week_avg'),1))}（较前7天 {esc(fmt(trend.get('week_delta'),1))}）")
+    lines.append(f"• 近30天均分: {esc(fmt(trend.get('month_avg'),1))}（较前30天 {esc(fmt(trend.get('month_delta'),1))}）")
+    if both_days is not None:
+        if both_days < 3:
+            lines.append(f"• 热量-评分相关: 样本不足（当前 {esc(both_days)} 天，至少 3 天）")
+        else:
+            lines.append(f"• 饮食×睡眠样本天数: {esc(both_days)}，热量-评分相关: {esc(fmt(corr,2))}")
 
     if alerts:
         lines.append("")

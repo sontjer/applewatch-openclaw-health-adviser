@@ -22,6 +22,7 @@ const DEFAULT_METRICS = [
   'environmentalAudioExposure',
   'appleStandHour',
   'walkingRunningDistance',
+  'workout',
 ];
 
 const METRIC_ALIASES = {
@@ -41,6 +42,7 @@ const METRIC_ALIASES = {
   environmentalAudioExposure: ['environmentalAudioExposure', 'environmental_audio_exposure'],
   appleStandHour: ['appleStandHour', 'apple_stand_hour'],
   walkingRunningDistance: ['walkingRunningDistance', 'walking_running_distance'],
+  workout: ['workout', 'workouts', 'appleWorkout', 'apple_workout'],
 };
 
 const CAPS = {
@@ -49,6 +51,7 @@ const CAPS = {
   activeEnergyBurned: 80,
   sleepAnalysis: 120,
   walkingRunningDistance: 80,
+  workout: 120,
   default: 60,
 };
 
@@ -140,14 +143,14 @@ export default {
         meta: {
           source: 'apple-health-auto-export',
           ingested_at: now.toISOString(),
-          strategy: 'whitelist + stratified_tail_truncation',
+          strategy: 'whitelist + stratified_tail_truncation + metric_key_merge_latest',
           ingest_id: ingestId,
           summary,
         },
         ...filtered,
       };
 
-      await putGithubFile(env, latestPath, body, true);
+      const mergeInfo = await upsertLatestMerged(env, latestPath, body);
       await putGithubFile(env, archivePath, body, false);
       await appendGithubJsonl(env, manifestPath, {
         ts: now.toISOString(),
@@ -157,6 +160,7 @@ export default {
         archive_path: archivePath,
         bytes_in: raw.length,
         bytes_out: JSON.stringify(filtered).length,
+        merge: mergeInfo,
       });
 
       console.log(
@@ -313,6 +317,177 @@ async function putGithubFile(env, path, contentObj, updateIfExists) {
   });
 }
 
+async function getGithubFile(env, path) {
+  const owner = env.GITHUB_OWNER;
+  const repo = env.GITHUB_REPO;
+  const branch = env.GITHUB_BRANCH || 'main';
+  const token = env.GITHUB_TOKEN;
+
+  if (!owner || !repo || !token) {
+    throw new Error('missing GitHub env vars');
+  }
+
+  const encodedPath = path
+    .split('/')
+    .map((p) => encodeURIComponent(p))
+    .join('/');
+  const endpoint = `https://api.github.com/repos/${owner}/${repo}/contents/${encodedPath}`;
+  const getResp = await ghFetch(endpoint + `?ref=${encodeURIComponent(branch)}`, token, { method: 'GET' }, true);
+  if (!getResp) return null;
+
+  let contentObj = null;
+  try {
+    contentObj = JSON.parse(decodeBase64(getResp.content || ''));
+  } catch {
+    contentObj = null;
+  }
+
+  return { sha: getResp.sha, contentObj };
+}
+
+async function putGithubFileWithSha(env, path, contentObj, sha) {
+  const owner = env.GITHUB_OWNER;
+  const repo = env.GITHUB_REPO;
+  const branch = env.GITHUB_BRANCH || 'main';
+  const token = env.GITHUB_TOKEN;
+
+  if (!owner || !repo || !token) {
+    throw new Error('missing GitHub env vars');
+  }
+
+  const encodedPath = path
+    .split('/')
+    .map((p) => encodeURIComponent(p))
+    .join('/');
+  const endpoint = `https://api.github.com/repos/${owner}/${repo}/contents/${encodedPath}`;
+
+  const text = JSON.stringify(contentObj, null, 2);
+  const payload = {
+    message: `[health] update ${path}`,
+    content: toBase64(text),
+    branch,
+    ...(sha ? { sha } : {}),
+  };
+
+  await ghFetch(endpoint, token, {
+    method: 'PUT',
+    body: JSON.stringify(payload),
+  });
+}
+
+function parseRecordTimeMs(record) {
+  if (!record || typeof record !== 'object') return null;
+  const fields = ['date', 'startDate', 'timestamp', 'sleepEnd', 'sleepStart', 'endDate'];
+  for (const f of fields) {
+    const v = record[f];
+    if (!v) continue;
+    const ms = Date.parse(String(v));
+    if (!Number.isNaN(ms)) return ms;
+  }
+  return null;
+}
+
+function inferMetricTimeMs(metricValue, fallbackMs) {
+  if (Array.isArray(metricValue)) {
+    let best = null;
+    for (const item of metricValue) {
+      const ms = parseRecordTimeMs(item);
+      if (ms == null) continue;
+      if (best == null || ms > best) best = ms;
+    }
+    return best == null ? fallbackMs : best;
+  }
+  if (metricValue && typeof metricValue === 'object') {
+    const ms = parseRecordTimeMs(metricValue);
+    return ms == null ? fallbackMs : ms;
+  }
+  return fallbackMs;
+}
+
+function normalizeMetricUpdatedAtMap(existing) {
+  const out = {};
+  if (!existing || typeof existing !== 'object') return out;
+  for (const [k, v] of Object.entries(existing)) {
+    if (typeof v === 'string') out[k] = v;
+  }
+  return out;
+}
+
+function mergeLatestBody(existingBody, incomingBody) {
+  const nowIso = incomingBody?.meta?.ingested_at || new Date().toISOString();
+  const nowMs = Date.parse(nowIso) || Date.now();
+  const existingMetrics = (existingBody && typeof existingBody.metrics === 'object' && existingBody.metrics) || {};
+  const incomingMetrics = (incomingBody && typeof incomingBody.metrics === 'object' && incomingBody.metrics) || {};
+  const mergedMetrics = { ...existingMetrics };
+
+  const existingMap = normalizeMetricUpdatedAtMap(existingBody?.meta?.metric_updated_at);
+  const metricUpdatedAt = { ...existingMap };
+  let applied = 0;
+  let skippedStale = 0;
+
+  for (const [key, incomingValue] of Object.entries(incomingMetrics)) {
+    const incomingMs = inferMetricTimeMs(incomingValue, nowMs);
+    const incomingIso = new Date(incomingMs).toISOString();
+    const existingMs = Date.parse(metricUpdatedAt[key] || '') || 0;
+    if (!metricUpdatedAt[key] || incomingMs >= existingMs) {
+      mergedMetrics[key] = incomingValue;
+      metricUpdatedAt[key] = incomingIso;
+      applied += 1;
+    } else {
+      skippedStale += 1;
+    }
+  }
+
+  const merged = {
+    ...(existingBody && typeof existingBody === 'object' ? existingBody : {}),
+    ...incomingBody,
+    metrics: mergedMetrics,
+    original_top_level_keys: incomingBody?.original_top_level_keys || [],
+    meta: {
+      ...((existingBody && existingBody.meta) || {}),
+      ...(incomingBody.meta || {}),
+      strategy: 'whitelist + stratified_tail_truncation + metric_key_merge_latest',
+      metric_updated_at: metricUpdatedAt,
+      merge: {
+        mode: 'metric_key_merge',
+        incoming_metrics: Object.keys(incomingMetrics),
+        total_metrics_after_merge: Object.keys(mergedMetrics).length,
+        applied,
+        skipped_stale: skippedStale,
+      },
+    },
+  };
+
+  return {
+    body: merged,
+    info: merged.meta.merge,
+  };
+}
+
+function isGithubShaConflict(err) {
+  const s = String(err && err.message ? err.message : err);
+  return s.includes('status=409') || s.includes('status=422');
+}
+
+async function upsertLatestMerged(env, latestPath, incomingBody) {
+  const maxAttempts = 4;
+  let lastErr = null;
+  for (let i = 0; i < maxAttempts; i++) {
+    const current = await getGithubFile(env, latestPath);
+    const existingBody = current?.contentObj && typeof current.contentObj === 'object' ? current.contentObj : {};
+    const merged = mergeLatestBody(existingBody, incomingBody);
+    try {
+      await putGithubFileWithSha(env, latestPath, merged.body, current?.sha);
+      return merged.info;
+    } catch (err) {
+      lastErr = err;
+      if (!isGithubShaConflict(err) || i === maxAttempts - 1) throw err;
+      await sleep(120 * (i + 1));
+    }
+  }
+  throw lastErr || new Error('latest_merge_failed');
+}
+
 
 async function appendGithubJsonl(env, path, rowObj) {
   const owner = env.GITHUB_OWNER;
@@ -330,29 +505,41 @@ async function appendGithubJsonl(env, path, rowObj) {
     .join('/');
   const endpoint = `https://api.github.com/repos/${owner}/${repo}/contents/${encodedPath}`;
 
-  const getResp = await ghFetch(endpoint + `?ref=${encodeURIComponent(branch)}`, token, { method: 'GET' }, true);
+  const maxAttempts = 4;
+  let lastErr = null;
+  for (let i = 0; i < maxAttempts; i++) {
+    try {
+      const getResp = await ghFetch(endpoint + `?ref=${encodeURIComponent(branch)}`, token, { method: 'GET' }, true);
 
-  let sha;
-  let current = '';
-  if (getResp && getResp.sha) {
-    sha = getResp.sha;
-    current = decodeBase64(getResp.content || '');
-    if (current && !current.endsWith('\n')) current += '\n';
+      let sha;
+      let current = '';
+      if (getResp && getResp.sha) {
+        sha = getResp.sha;
+        current = decodeBase64(getResp.content || '');
+        if (current && !current.endsWith('\n')) current += '\n';
+      }
+
+      current += JSON.stringify(rowObj) + '\n';
+
+      const payload = {
+        message: `[health] append ${path}`,
+        content: toBase64(current),
+        branch,
+        sha,
+      };
+
+      await ghFetch(endpoint, token, {
+        method: 'PUT',
+        body: JSON.stringify(payload),
+      });
+      return;
+    } catch (err) {
+      lastErr = err;
+      if (!isGithubShaConflict(err) || i === maxAttempts - 1) throw err;
+      await sleep(120 * (i + 1));
+    }
   }
-
-  current += JSON.stringify(rowObj) + '\n';
-
-  const payload = {
-    message: `[health] append ${path}`,
-    content: toBase64(current),
-    branch,
-    sha,
-  };
-
-  await ghFetch(endpoint, token, {
-    method: 'PUT',
-    body: JSON.stringify(payload),
-  });
+  throw lastErr || new Error('append_jsonl_failed');
 }
 
 async function sha256Hex(text) {
