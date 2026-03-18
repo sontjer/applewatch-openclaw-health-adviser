@@ -117,6 +117,17 @@ def metric_dates(series: List[Dict[str, Any]]) -> List[datetime]:
     return out
 
 
+def count_on_date(series: List[Dict[str, Any]], day: str) -> int:
+    n = 0
+    for r in series:
+        dt = parse_dt(r.get('date') or r.get('startDate') or r.get('timestamp') or r.get('sleepEnd') or r.get('sleepStart'))
+        if dt is None:
+            continue
+        if dt.date().isoformat() == day:
+            n += 1
+    return n
+
+
 def select_recent(series: List[Dict[str, Any]], days: int, now: datetime) -> List[Dict[str, Any]]:
     out = []
     for r in series:
@@ -184,29 +195,47 @@ def summarize_activity(
     flights_series: List[Dict[str, Any]],
     distance_series: List[Dict[str, Any]],
 ) -> Dict[str, Optional[float]]:
-    steps = [to_float(r.get('qty') or r.get('value')) for r in step_series]
-    steps = [x for x in steps if x is not None]
-    exercise_min = [to_float(r.get('qty') or r.get('value')) for r in exercise_series]
-    exercise_min = [x for x in exercise_min if x is not None]
-    active_kj = [to_float(r.get('qty') or r.get('value')) for r in active_energy_series]
-    active_kj = [x for x in active_kj if x is not None]
-    flights = [to_float(r.get('qty') or r.get('value')) for r in flights_series]
-    flights = [x for x in flights if x is not None]
-    distance_km = [to_float(r.get('qty') or r.get('value')) for r in distance_series]
-    distance_km = [x for x in distance_km if x is not None]
+    def daily_sum(series: List[Dict[str, Any]], is_kj: bool = False) -> Dict[str, float]:
+        out: Dict[str, float] = {}
+        for r in series:
+            dt = parse_dt(r.get('date') or r.get('startDate') or r.get('timestamp'))
+            v = to_float(r.get('qty') or r.get('value'))
+            if dt is None or v is None:
+                continue
+            if is_kj:
+                v = v / 4.184  # kJ -> kcal
+            d = dt.date().isoformat()
+            out[d] = out.get(d, 0.0) + float(v)
+        return out
 
-    # kJ -> kcal
-    active_kcal = [x / 4.184 for x in active_kj]
+    steps_day = daily_sum(step_series)
+    exercise_day = daily_sum(exercise_series)
+    active_kcal_day = daily_sum(active_energy_series, is_kj=True)
+    flights_day = daily_sum(flights_series)
+    distance_day = daily_sum(distance_series)
+
+    def avg_day(m: Dict[str, float]) -> Optional[float]:
+        return avg(list(m.values())) if m else None
+
+    def sum_day(m: Dict[str, float]) -> Optional[float]:
+        return sum(m.values()) if m else None
+
     return {
-        'steps_avg': avg(steps),
-        'exercise_min_avg': avg(exercise_min),
-        'active_kcal_avg': avg(active_kcal),
-        'flights_avg': avg(flights),
-        'distance_km_avg': avg(distance_km),
+        'steps_avg': avg_day(steps_day),
+        'steps_total': sum_day(steps_day),
+        'exercise_min_avg': avg_day(exercise_day),
+        'exercise_min_total': sum_day(exercise_day),
+        'active_kcal_avg': avg_day(active_kcal_day),
+        'active_kcal_total': sum_day(active_kcal_day),
+        'flights_avg': avg_day(flights_day),
+        'flights_total': sum_day(flights_day),
+        'distance_km_avg': avg_day(distance_day),
+        'distance_km_total': sum_day(distance_day),
     }
 
 
 FOOD_DB = {
+
     '米饭': (220, 4, 50, 0.5),
     '小碗米饭': (160, 3, 36, 0.4),
     '牛柳': (260, 24, 8, 16),
@@ -393,6 +422,7 @@ def main() -> None:
 
     latest_score = load_json(latest_score_path)
     score = latest_score.get('score', {})
+    score_meta = latest_score.get('score_meta', {})
     preview = latest_score.get('input_preview', {})
     latest_data = load_json(latest_data_path)
     metrics_map = get_metrics_map(latest_data)
@@ -499,11 +529,9 @@ def main() -> None:
 
     # Diet + cross analysis
     diet_map = parse_diet(repo)
+    # Strict daily mode: only use diet records on the report date.
+    # Do not fallback to previous days; otherwise "today" panel may show stale values.
     today_diet = diet_map.get(date_key)
-    if not today_diet and diet_map:
-        # Fallback to the most recent logged diet day when sleep-date bucket has no meal records.
-        latest_d = sorted(diet_map.keys())[-1]
-        today_diet = diet_map.get(latest_d)
     corr_x, corr_y = [], []
     for x in history[-30:]:
         d = x.get('date')
@@ -540,6 +568,42 @@ def main() -> None:
     recs_by_dim = recommend_by_dimension(metric_summary, activity_sum, score, today_diet)
     recs = [f"[{k}] {item}" for k in ('摄入', '作息', '运动') for item in recs_by_dim[k]]
 
+    required_daily = {
+        'sleepAnalysis': sleep_series,
+        'restingHeartRate': rhr_series,
+        'heartRate': hr_series,
+        'stepCount': step_series,
+        'activeEnergyBurned': active_energy_series,
+        'appleExerciseTime': exercise_series,
+    }
+    optional_daily = {
+        'oxygenSaturation': spo2_series,
+        'appleSleepingWristTemperature': temp_series,
+        'flightsClimbed': flights_series,
+        'walkingRunningDistance': distance_series,
+    }
+
+    req_counts = {k: count_on_date(v, date_key) for k, v in required_daily.items()}
+    opt_counts = {k: count_on_date(v, date_key) for k, v in optional_daily.items()}
+    req_present = sum(1 for v in req_counts.values() if v > 0)
+    req_total = len(required_daily)
+    completeness_pct = round((req_present / req_total) * 100, 1) if req_total else None
+    missing_required = [k for k, v in req_counts.items() if v == 0]
+
+    data_quality = {
+        'target_date': date_key,
+        'required_metric_coverage_pct': completeness_pct,
+        'required_present': req_present,
+        'required_total': req_total,
+        'missing_required_metrics': missing_required,
+        'required_counts': req_counts,
+        'optional_counts': opt_counts,
+        'status': 'ok' if not missing_required else 'incomplete',
+    }
+
+    if missing_required:
+        alerts.append('数据完整性告警：日报必需指标缺失（' + ', '.join(missing_required) + '）。')
+
     insights = {
         'generated_at': datetime.utcnow().isoformat() + 'Z',
         'period': {
@@ -548,6 +612,7 @@ def main() -> None:
             'aggregation': 'average' if period_days > 1 else 'single_day',
         },
         'latest_score': score,
+        'score_meta': score_meta,
         'core_metrics': metric_summary,
         'alerts': alerts,
         'trend': {
@@ -562,9 +627,11 @@ def main() -> None:
             'days_with_both_data': len(corr_x),
             'calories_vs_sleep_score_corr': cal_sleep_corr,
             'today_nutrition': nutrition_eval,
+            'today_nutrition_date': date_key if nutrition_eval else None,
             'note': '相关系数仅用于趋势观察，不用于医学诊断。',
         },
         'activity_summary': activity_sum,
+        'data_quality': data_quality,
         'recommendations_by_dimension': recs_by_dim,
         'recommendations': recs,
     }
@@ -584,6 +651,7 @@ def main() -> None:
     lines.append('')
     lines.append('## 总结')
     lines.append(f"- 节律评分：**{score.get('total')} ({score.get('grade')})**")
+    lines.append(f"- 评分来源：`{score_meta.get('score_source','unknown')}`，数据新鲜度：`{fmt(score_meta.get('data_freshness_minutes'),1,' min')}`")
     lines.append(f"- 关键风险：{('；'.join(alerts) if alerts else '无高优先级告警')}" )
     lines.append(f"- 本周趋势：近7天均分 `{fmt(week_avg,1)}`（较前7天 `{fmt(insights['trend']['week_delta'],1)}`）")
     lines.append('')
@@ -599,6 +667,12 @@ def main() -> None:
     lines.append(f"- REM 眼动：`{fmt(m['sleep_rem_h'],2,' h')}`")
     lines.append(f"- 清醒时长：`{fmt(m['sleep_awake_h'],2,' h')}`")
     lines.append('')
+    lines.append('## 数据完整性检查')
+    lines.append(f"- 目标日期：`{data_quality['target_date']}`")
+    lines.append(f"- 必需指标覆盖率：`{fmt(data_quality['required_metric_coverage_pct'],1,' %')}`（{data_quality['required_present']}/{data_quality['required_total']}）")
+    lines.append(f"- 缺失必需指标：`{', '.join(data_quality['missing_required_metrics']) if data_quality['missing_required_metrics'] else '无'}`")
+    lines.append('')
+
     lines.append('## 运动情况')
     lines.append(f"- 步数（日均）：`{fmt(activity_sum['steps_avg'],0,' 步')}`")
     lines.append(f"- 运动时长（日均）：`{fmt(activity_sum['exercise_min_avg'],1,' 分钟')}`")

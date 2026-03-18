@@ -6,6 +6,7 @@ import json
 import os
 import urllib.parse
 import urllib.request
+import time
 from pathlib import Path
 
 
@@ -33,8 +34,16 @@ def esc(v) -> str:
 def post(url: str, data: dict) -> dict:
     encoded = urllib.parse.urlencode(data).encode('utf-8')
     req = urllib.request.Request(url, data=encoded, method='POST')
-    with urllib.request.urlopen(req, timeout=20) as resp:
-        return json.loads(resp.read().decode('utf-8'))
+    last_err = None
+    for i in range(3):
+        try:
+            with urllib.request.urlopen(req, timeout=20) as resp:
+                return json.loads(resp.read().decode('utf-8'))
+        except Exception as e:
+            last_err = e
+            if i < 2:
+                time.sleep(1.5 * (i + 1))
+    raise last_err
 
 
 def main() -> None:
@@ -69,11 +78,29 @@ def main() -> None:
     corr = ins.get('diet_sleep_cross', {}).get('calories_vs_sleep_score_corr')
     both_days = ins.get('diet_sleep_cross', {}).get('days_with_both_data')
     rec_dim = ins.get('recommendations_by_dimension', {})
+    dq = ins.get('data_quality', {})
+    score_meta = ins.get('score_meta', {})
+
+    min_cov = float(os.environ.get('HEALTH_DAILY_MIN_COVERAGE_PCT', '80').strip() or '80')
+    cov = dq.get('required_metric_coverage_pct')
+    is_incomplete = False
+    try:
+        is_incomplete = (cov is None) or (float(cov) < min_cov)
+    except Exception:
+        is_incomplete = True
+    score_source = score_meta.get('score_source', 'unknown')
+    freshness = score_meta.get('data_freshness_minutes')
+    fb_count = score_meta.get('consecutive_fallback_count')
 
     lines = []
-    lines.append("📊 <b>健康分析报告</b>")
+    title = "⚠️ <b>健康分析报告（草稿：数据不完整）</b>" if is_incomplete else "📊 <b>健康分析报告</b>"
+    lines.append(title)
     lines.append(f"🗓️ 统计窗口: {esc(period)}（口径: {esc(agg)}）")
     lines.append(f"🎯 节律评分: <b>{esc(score.get('total'))} ({esc(score.get('grade'))})</b>")
+    lines.append(f"🧩 数据完整度: {esc(fmt(dq.get('required_metric_coverage_pct'),1,' %'))}（{esc(dq.get('required_present'))}/{esc(dq.get('required_total'))}）")
+    if is_incomplete:
+        lines.append(f"🚧 发布门槛: 覆盖率低于 {esc(fmt(min_cov,1,' %'))}，本次按草稿推送")
+    lines.append(f"🧪 评分来源: {esc(score_source)}，数据新鲜度: {esc(fmt(freshness,1,' 分钟'))}，连续fallback: {esc(fb_count)}")
     lines.append("")
     lines.append("🫀 <b>核心身体指标</b>")
     lines.append("<pre>")

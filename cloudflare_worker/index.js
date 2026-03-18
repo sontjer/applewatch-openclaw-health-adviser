@@ -21,6 +21,7 @@ const DEFAULT_METRICS = [
   'sleepAnalysis',
   'environmentalAudioExposure',
   'appleStandHour',
+  'walkingRunningDistance',
 ];
 
 const METRIC_ALIASES = {
@@ -39,6 +40,7 @@ const METRIC_ALIASES = {
   sleepAnalysis: ['sleepAnalysis', 'sleep_analysis'],
   environmentalAudioExposure: ['environmentalAudioExposure', 'environmental_audio_exposure'],
   appleStandHour: ['appleStandHour', 'apple_stand_hour'],
+  walkingRunningDistance: ['walkingRunningDistance', 'walking_running_distance'],
 };
 
 const CAPS = {
@@ -46,6 +48,7 @@ const CAPS = {
   stepCount: 80,
   activeEnergyBurned: 80,
   sleepAnalysis: 120,
+  walkingRunningDistance: 80,
   default: 60,
 };
 
@@ -114,11 +117,14 @@ export default {
 
       const latestPath = 'data/latest.json';
       const archivePath = `data/archive/${datePath}/${stamp}.json`;
+      const manifestPath = 'data/manifests/ingest_log.jsonl';
+      const ingestId = await sha256Hex(raw);
 
       const summary = {
         reqId,
         ts: now.toISOString(),
         metrics: Object.keys(filtered.metrics || {}),
+        ingest_id: ingestId,
         bytes_in: raw.length,
         bytes_out: JSON.stringify(filtered).length,
         github: {
@@ -135,6 +141,7 @@ export default {
           source: 'apple-health-auto-export',
           ingested_at: now.toISOString(),
           strategy: 'whitelist + stratified_tail_truncation',
+          ingest_id: ingestId,
           summary,
         },
         ...filtered,
@@ -142,16 +149,27 @@ export default {
 
       await putGithubFile(env, latestPath, body, true);
       await putGithubFile(env, archivePath, body, false);
+      await appendGithubJsonl(env, manifestPath, {
+        ts: now.toISOString(),
+        ingest_id: ingestId,
+        req_id: reqId,
+        latest_path: latestPath,
+        archive_path: archivePath,
+        bytes_in: raw.length,
+        bytes_out: JSON.stringify(filtered).length,
+      });
 
       console.log(
         JSON.stringify({
           event: 'ingest_written',
           reqId,
+          ingestId,
           latestPath,
           archivePath,
+          manifestPath,
         }),
       );
-      return json({ ok: true, summary, latestPath, archivePath });
+      return json({ ok: true, summary, ingestId, latestPath, archivePath, manifestPath });
     } catch (e) {
       console.error(
         JSON.stringify({
@@ -295,6 +313,57 @@ async function putGithubFile(env, path, contentObj, updateIfExists) {
   });
 }
 
+
+async function appendGithubJsonl(env, path, rowObj) {
+  const owner = env.GITHUB_OWNER;
+  const repo = env.GITHUB_REPO;
+  const branch = env.GITHUB_BRANCH || 'main';
+  const token = env.GITHUB_TOKEN;
+
+  if (!owner || !repo || !token) {
+    throw new Error('missing GitHub env vars');
+  }
+
+  const encodedPath = path
+    .split('/')
+    .map((p) => encodeURIComponent(p))
+    .join('/');
+  const endpoint = `https://api.github.com/repos/${owner}/${repo}/contents/${encodedPath}`;
+
+  const getResp = await ghFetch(endpoint + `?ref=${encodeURIComponent(branch)}`, token, { method: 'GET' }, true);
+
+  let sha;
+  let current = '';
+  if (getResp && getResp.sha) {
+    sha = getResp.sha;
+    current = decodeBase64(getResp.content || '');
+    if (current && !current.endsWith('\n')) current += '\n';
+  }
+
+  current += JSON.stringify(rowObj) + '\n';
+
+  const payload = {
+    message: `[health] append ${path}`,
+    content: toBase64(current),
+    branch,
+    sha,
+  };
+
+  await ghFetch(endpoint, token, {
+    method: 'PUT',
+    body: JSON.stringify(payload),
+  });
+}
+
+async function sha256Hex(text) {
+  const data = new TextEncoder().encode(text);
+  const digest = await crypto.subtle.digest('SHA-256', data);
+  const bytes = new Uint8Array(digest);
+  return Array.from(bytes)
+    .map((b) => b.toString(16).padStart(2, '0'))
+    .join('');
+}
+
 async function ghFetch(url, token, init, allow404 = false) {
   const maxRetries = 3;
   for (let i = 0; i <= maxRetries; i++) {
@@ -323,6 +392,14 @@ async function ghFetch(url, token, init, allow404 = false) {
   }
 
   throw new Error('github_api_error_exhausted');
+}
+
+function decodeBase64(base64Text) {
+  const clean = (base64Text || '').replace(/\n/g, '');
+  if (!clean) return '';
+  const bin = atob(clean);
+  const bytes = Uint8Array.from(bin, (c) => c.charCodeAt(0));
+  return new TextDecoder().decode(bytes);
 }
 
 function toBase64(text) {

@@ -47,7 +47,7 @@ set -a; source /root/.health_pipeline.env; set +a
 flowchart TD
     A[iPhone Health + Apple Watch] -->|Auto Export JSON POST| B[Cloudflare Worker]
     B -->|Whitelist + Truncate + Auth| C[(GitHub Data Repo)]
-    D[OpenClaw Agent Host] -->|cron git pull| C
+    D[OpenClaw Agent Host] -->|systemd timer pull| C
     D --> E[analyze_latest.py]
     E --> F[generate_health_report.py]
     F --> G[daily_health_report.md / insights.json]
@@ -75,11 +75,21 @@ cloudflare_worker/
 
 openclaw_agent/
   pull_and_score.sh      # 一键 pull + 分析 + 报告 + Telegram
+  run_health_pipeline_once.sh # 带锁的一次执行入口（systemd 调用）
+  run_health_reconcile_once.sh # 带锁的一次对账入口
   analyze_latest.py      # 节律评分输入构建与计算
   generate_health_report.py # 结构化健康报告 + 告警 + 周月趋势 + 饮食交叉
+  enrich_report_meta.py  # 评分来源/新鲜度/连续fallback元数据
+  reconcile_health_ingest.py # manifest/archive/latest 对账
   notify_telegram.py     # Telegram 推送
   diet_log_template.csv  # 精确营养录入模板
   meal_text_log_template.csv # 自然语言餐食录入模板
+
+systemd/
+  health-pipeline.service
+  health-pipeline.timer
+  health-reconcile.service
+  health-reconcile.timer
 ```
 
 ---
@@ -90,7 +100,7 @@ openclaw_agent/
 - Cloudflare 账号（Workers）
 - GitHub 账号（可创建私有数据仓）
 - OpenClaw Agent 主机（Linux/macOS 均可）
-- 主机工具：`python3` `git` `cron` `node/npm`
+- 主机工具：`python3` `git` `systemd` `node/npm`
 
 ---
 
@@ -146,7 +156,11 @@ wrangler deploy
 - Header:
   - Key: `X-Auth-Key`
   - Value: 与 `INGEST_KEY` 一致
-- 建议：开启 `Since Last Sync`
+- 日期范围（日报推荐）：`今天`
+
+> 说明：  
+> 为了“日报完整性优先”，建议使用 `今天` 全量快照，而不是 `Since Last Sync` 增量。  
+> `Since Last Sync` 需要更复杂的累积/去重逻辑，容易出现周期内指标缺失或口径漂移。
 
 ### Step D. Agent 主机部署
 
@@ -187,12 +201,23 @@ set -a; source /root/.health_pipeline.env; set +a
 - `data/report/daily_health_report.md`
 - 终端出现 `telegram_sent_ok`
 
-### Step F. 定时任务（系统 cron）
+### Step F. 定时任务（推荐 systemd timer）
 
-示例：每天 08:18
+```bash
+sudo install -m 644 systemd/health-pipeline.service /etc/systemd/system/health-pipeline.service
+sudo install -m 644 systemd/health-pipeline.timer /etc/systemd/system/health-pipeline.timer
+sudo install -m 644 systemd/health-reconcile.service /etc/systemd/system/health-reconcile.service
+sudo install -m 644 systemd/health-reconcile.timer /etc/systemd/system/health-reconcile.timer
 
-```cron
-18 8 * * * . /root/.health_pipeline.env; /root/applewatch-openclaw-health-adviser/openclaw_agent/pull_and_score.sh >> /tmp/health_pipeline.log 2>&1 # health-pipeline
+sudo systemctl daemon-reload
+sudo systemctl enable --now health-pipeline.timer
+sudo systemctl enable --now health-reconcile.timer
+```
+
+查看下次触发：
+
+```bash
+systemctl list-timers --all | rg 'health-pipeline|health-reconcile'
 ```
 
 ---
@@ -286,6 +311,17 @@ python3 /root/codex/skills/meal-intake-log/scripts/log_meal_text.py \
 
 - 近7天均分与前7天对比
 - 近30天均分与前30天对比
+
+### 7.5 数据完整性门槛（日报）
+
+- 报告内置“必需指标覆盖率”检查（例如 `sleepAnalysis/heartRate/stepCount/...`）
+- 输出字段：
+  - `data_quality.required_metric_coverage_pct`
+  - `data_quality.missing_required_metrics`
+  - `data_quality.status`
+- Telegram 推送支持门槛策略：
+  - 环境变量 `HEALTH_DAILY_MIN_COVERAGE_PCT`（默认 `80`）
+  - 低于阈值自动标记为“草稿：数据不完整”
 
 ---
 

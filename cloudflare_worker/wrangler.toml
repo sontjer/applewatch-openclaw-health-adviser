@@ -7,10 +7,10 @@ workers_dev = true
 enabled = true
 
 [vars]
-GITHUB_OWNER = "<your-github-user-or-org>"
-GITHUB_REPO = "<your-data-repo>"
+GITHUB_OWNER = "sontjer"
+GITHUB_REPO = "data_sync_analysis"
 GITHUB_BRANCH = "main"
-METRIC_WHITELIST = "heartRateVariabilitySDNN,oxygenSaturation,restingHeartRate,respiratoryRate,appleSleepingWristTemperature,heartRate,stepCount,activeEnergyBurned,basalEnergyBurned,appleExerciseTime,flightsClimbed,vo2Max,sleepAnalysis,environmentalAudioExposure,appleStandHour"
+METRIC_WHITELIST = "heartRateVariabilitySDNN,oxygenSaturation,restingHeartRate,respiratoryRate,appleSleepingWristTemperature,heartRate,stepCount,activeEnergyBurned,basalEnergyBurned,appleExerciseTime,flightsClimbed,vo2Max,sleepAnalysis,environmentalAudioExposure,appleStandHour,walkingRunningDistance"
 MAX_REQ_BYTES = "8000000"
 
 # set with:

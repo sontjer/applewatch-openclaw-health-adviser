@@ -1,0 +1,11 @@
+[Unit]
+Description=Run Health Reconcile Daily 08:28
+
+[Timer]
+OnCalendar=*-*-* 08:28:00
+Persistent=true
+RandomizedDelaySec=30
+Unit=health-reconcile.service
+
+[Install]
+WantedBy=timers.target

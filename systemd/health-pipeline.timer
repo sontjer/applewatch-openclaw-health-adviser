@@ -1,0 +1,11 @@
+[Unit]
+Description=Run Health Pipeline Daily 08:18
+
+[Timer]
+OnCalendar=*-*-* 08:18:00
+Persistent=true
+RandomizedDelaySec=30
+Unit=health-pipeline.service
+
+[Install]
+WantedBy=timers.target

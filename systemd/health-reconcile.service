@@ -1,0 +1,14 @@
+[Unit]
+Description=Health Ingest Reconciliation
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+ExecStart=/root/applewatch_openclaw_pipeline/openclaw_agent/run_health_reconcile_once.sh
+WorkingDirectory=/root/applewatch_openclaw_pipeline
+User=root
+Group=root
+
+[Install]
+WantedBy=multi-user.target

@@ -12,10 +12,13 @@
    - JSON + REST POST
    - URL=`workers.dev` 或自定义域
    - Header=`X-Auth-Key=<INGEST_KEY>`
+   - 日期范围推荐=`今天`（日报完整性优先）
 4. Agent 主机：
    - 配置 `/root/.health_pipeline.env`
    - 手动执行 `pull_and_score.sh`
-5. 配置 cron（示例 08:18）。
+5. 配置 systemd timer（推荐，支持重启补跑）：
+   - `health-pipeline.timer`（08:18）
+   - `health-reconcile.timer`（08:28）
 
 ## 2. 验收清单
 
@@ -50,5 +53,5 @@ set -a; source /root/.health_pipeline.env; set +a
 ## 5. 最少维护动作
 
 1. 每月轮换 `PAT / Cloudflare Token / Telegram Token`。
-2. 查看 `/tmp/health_pipeline.log` 是否有连续失败。
+2. 查看 `/root/.openclaw/ops/health_pipeline.log` 是否有连续失败。
 3. 每周检查一次 `data/latest.json` 更新时间是否连续。
