@@ -46,6 +46,13 @@
 2. 时区是否一致（建议统一 `+0800`）
 3. 该条记录是否被成功写入数据仓
 
+推荐使用固定入口，避免“回执成功但未落盘”：
+
+```bash
+/root/applewatch-openclaw-health-adviser/openclaw_agent/log_meal_from_text.sh \
+  "记饮食：今天早上吃了一个水煮蛋、一碗芝麻糊"
+```
+
 ## Q6. 怎么快速确认当前最新评分？
 
 ```bash

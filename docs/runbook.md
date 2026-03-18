@@ -42,6 +42,10 @@ set -a; source /root/.health_pipeline.env; set +a
 ## 4. 饮食自然语言录入（即时生效）
 
 ```bash
+/root/applewatch-openclaw-health-adviser/openclaw_agent/log_meal_from_text.sh \
+  "记饮食：今天中午吃了芹菜金针菇蛋汤、青椒牛柳、红烧鲫鱼、炒生菜、一小碗米饭"
+
+# 可选：直接调用底层 skill（不推荐作为默认入口）
 python3 /root/codex/skills/meal-intake-log/scripts/log_meal_text.py \
   --repo-dir /root/.openclaw/workspace/health-data \
   --text "今天中午吃了芹菜金针菇蛋汤、青椒牛柳、红烧鲫鱼、炒生菜、一小碗米饭"
@@ -49,6 +53,12 @@ python3 /root/codex/skills/meal-intake-log/scripts/log_meal_text.py \
 set -a; source /root/.health_pipeline.env; set +a
 /root/applewatch-openclaw-health-adviser/openclaw_agent/pull_and_score.sh
 ```
+
+固定入口 `log_meal_from_text.sh` 会做写入校验：
+
+1. 解析并去掉前缀 `记饮食：`
+2. 调用 `log_meal_text.py` 写入 `meal_text_log.csv`
+3. 校验 CSV 最后一行与写入输出一致，成功才回执
 
 ## 5. 最少维护动作
 

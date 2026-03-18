@@ -77,6 +77,7 @@ openclaw_agent/
   pull_and_score.sh      # 一键 pull + 分析 + 报告 + Telegram
   run_health_pipeline_once.sh # 带锁的一次执行入口（systemd 调用）
   run_health_reconcile_once.sh # 带锁的一次对账入口
+  log_meal_from_text.sh  # 自然语言“记饮食：...”固定入口（含写入校验）
   analyze_latest.py      # 节律评分输入构建与计算
   generate_health_report.py # 结构化健康报告 + 告警 + 周月趋势 + 饮食交叉
   enrich_report_meta.py  # 评分来源/新鲜度/连续fallback元数据
@@ -286,10 +287,17 @@ timestamp,meal,description
 Agent 处理约定：
 
 1. 去掉前缀 `记饮食：`
-2. 调用 `meal-intake-log` skill 落盘
+2. 调用固定入口 `openclaw_agent/log_meal_from_text.sh` 落盘（内部调用 `meal-intake-log` skill）
 3. 可选立即触发一次 `pull_and_score.sh`（即时更新 Telegram 报告）
 
-Skill 命令（服务器）：
+固定入口命令（推荐）：
+
+```bash
+/root/applewatch-openclaw-health-adviser/openclaw_agent/log_meal_from_text.sh \
+  "记饮食：今天中午吃了芹菜金针菇蛋汤、青椒牛柳、红烧鲫鱼、炒生菜、一小碗米饭"
+```
+
+Skill 底层命令（脚本内部调用）：
 
 ```bash
 python3 /root/codex/skills/meal-intake-log/scripts/log_meal_text.py \
@@ -301,6 +309,12 @@ python3 /root/codex/skills/meal-intake-log/scripts/log_meal_text.py \
 
 - `--timestamp \"YYYY-mm-dd HH:MM:SS\"`（补录历史）
 - `--meal breakfast|lunch|dinner|snack|unspecified`（覆盖自动识别）
+
+固定入口脚本保证：
+
+- 必须写入 `data/diet/meal_text_log.csv`
+- 写入后校验 CSV 最后一行与脚本输出一致才回执成功
+- 避免“只写 memory 文件就回复已记录”的伪成功
 
 并自动做：
 
