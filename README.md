@@ -13,6 +13,8 @@
 ![Telegram收到最终报告效果](docs/images/telegram-final-report.png)
 ![健康报告效果图2](docs/images/health-record2.jpg)
 
+applewatch-openclaw-health-adviser，是一个旨在将 Apple Watch 采集的原始健康数据转化为智能化、结构化建议的开源工具。它通过 iOS Health Auto Export 自动导出各项生理指标，利用 Cloudflare Worker 进行数据中转，并存储于私有代码库中。系统核心依托 OpenClaw Agent 进行深度分析，涵盖睡眠、心率、血氧及饮食等多个维度，并能自动生成科学的健康评分与趋势报告。最终，这些定制化的健康洞察和异常预警会通过 Telegram 等平台实时推送到用户手机，实现个人健康数据的闭环管理。该系统具有高度的可扩展性，支持自然语言记录饮食，是提升可穿戴设备数据利用价值的进阶方案。
+
 从零搭建一条可运行的健康数据闭环：
 
 - iOS `Health Auto Export` 自动导出 JSON
