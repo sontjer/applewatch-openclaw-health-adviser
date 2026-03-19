@@ -244,6 +244,44 @@ def latest_numeric(series: List[Dict[str, Any]]) -> Optional[float]:
     return best_v
 
 
+def median_vals(vals: List[float]) -> Optional[float]:
+    if not vals:
+        return None
+    xs = sorted(vals)
+    n = len(xs)
+    if n % 2 == 1:
+        return xs[n // 2]
+    return (xs[n // 2 - 1] + xs[n // 2]) / 2
+
+
+def _align_tz(dt: datetime, ref: datetime) -> datetime:
+    if dt.tzinfo is None and ref.tzinfo is not None:
+        return dt.replace(tzinfo=ref.tzinfo)
+    return dt
+
+
+def window_median_numeric(
+    series: List[Dict[str, Any]],
+    start: datetime,
+    end: datetime,
+    now: datetime,
+) -> Optional[float]:
+    vals: List[float] = []
+    st = _align_tz(start, now)
+    ed = _align_tz(end, now)
+    if ed <= st:
+        return None
+    for r in series:
+        t = pick_time(r, ['date', 'startDate', 'start', 'timestamp'])
+        v = pick_float(r, ['value', 'qty', 'amount'])
+        if t is None or v is None:
+            continue
+        t = _align_tz(t, now)
+        if st <= t <= ed:
+            vals.append(v)
+    return median_vals(vals)
+
+
 def median_numeric(series: List[Dict[str, Any]], days: int = 28) -> Optional[float]:
     now = datetime.now().astimezone()
     vals = []
@@ -256,13 +294,7 @@ def median_numeric(series: List[Dict[str, Any]], days: int = 28) -> Optional[flo
             t = t.replace(tzinfo=now.tzinfo)
         if (now - t).days <= days:
             vals.append(v)
-    if not vals:
-        return None
-    vals.sort()
-    n = len(vals)
-    if n % 2 == 1:
-        return vals[n // 2]
-    return (vals[n // 2 - 1] + vals[n // 2]) / 2
+    return median_vals(vals)
 
 
 def build_input(filtered: Dict[str, Any]) -> Dict[str, Any]:
@@ -287,8 +319,26 @@ def build_input(filtered: Dict[str, Any]) -> Dict[str, Any]:
     rhr_series = normalize_series(pick_metric(metrics, 'restingHeartRate', 'resting_heart_rate'))
     rr_series = normalize_series(pick_metric(metrics, 'respiratoryRate', 'respiratory_rate'))
 
-    hrv = latest_numeric(hrv_series)
-    baseline_hrv = median_numeric(hrv_series, 28)
+    now = datetime.now().astimezone()
+    hrv = window_median_numeric(hrv_series, last['bedtime'], last['wake_time'], now)
+    if hrv is None:
+        # Safety fallback when sleep window has no HRV samples.
+        hrv = latest_numeric(hrv_series)
+
+    baseline_hrv_vals: List[float] = []
+    for n in nights:
+        bt = _align_tz(n['bedtime'], now)
+        wt = _align_tz(n['wake_time'], now)
+        if wt <= bt:
+            continue
+        if (now - wt).days > 28:
+            continue
+        v = window_median_numeric(hrv_series, bt, wt, now)
+        if v is not None:
+            baseline_hrv_vals.append(v)
+    baseline_hrv = median_vals(baseline_hrv_vals)
+    if baseline_hrv is None:
+        baseline_hrv = median_numeric(hrv_series, 28)
     rhr = latest_numeric(rhr_series)
     baseline_rhr = median_numeric(rhr_series, 28)
     rr = latest_numeric(rr_series)
