@@ -6,7 +6,7 @@ GITHUB_PAT="${HEALTH_GITHUB_PAT:-}"
 REPO_DIR="${HEALTH_REPO_DIR:-$HOME/.openclaw/workspace/health-data}"
 BRANCH="${HEALTH_REPO_BRANCH:-main}"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-OPS_DIR="${HEALTH_OPS_DIR:-/root/.openclaw/ops}"
+OPS_DIR="${HEALTH_OPS_DIR:-$HOME/.openclaw/ops}"
 FALLBACK_SCORE_PATH="${HEALTH_FALLBACK_SCORE_PATH:-$OPS_DIR/health_latest_score_fallback.json}"
 STATE_PATH="${HEALTH_STATE_PATH:-$OPS_DIR/health_state.json}"
 

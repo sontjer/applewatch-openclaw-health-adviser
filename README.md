@@ -110,7 +110,7 @@ systemd/
 - Cloudflare 账号（Workers）
 - GitHub 账号（可创建私有数据仓）
 - OpenClaw Agent 主机（Linux/macOS 均可）
-- 主机工具：`python3` `git` `systemd` `node/npm`
+- 主机工具：`python3(>=3.10)` `git` `systemd` `node(>=20)/npm` `wrangler(4.74.0)`
 
 ---
 
@@ -185,6 +185,8 @@ HEALTH_REPO_URL=https://github.com/<you>/<data-repo>.git
 HEALTH_REPO_BRANCH=main
 HEALTH_REPO_DIR=/root/.openclaw/workspace/health-data
 HEALTH_GITHUB_PAT=<github_pat_for_private_repo>
+SLEEP_SCORER_PATH=/root/codex
+MEAL_SKILL_PATH=/root/codex/skills/meal-intake-log/scripts/log_meal_text.py
 
 # Telegram (optional but recommended)
 TELEGRAM_BOT_TOKEN=<bot_token>

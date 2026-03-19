@@ -1,11 +1,12 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-LOCK_FILE="${HEALTH_RECON_LOCKFILE:-/root/.openclaw/ops/health_reconcile.lock}"
-LOG_FILE="${HEALTH_RECON_LOGFILE:-/root/.openclaw/ops/health_reconcile.log}"
-ENV_FILE="${HEALTH_PIPELINE_ENV_FILE:-/root/.health_pipeline.env}"
-REPO_DIR="${HEALTH_REPO_DIR:-/root/.openclaw/workspace/health-data}"
-SCRIPT="/root/applewatch_openclaw_pipeline/openclaw_agent/reconcile_health_ingest.py"
+LOCK_FILE="${HEALTH_RECON_LOCKFILE:-$HOME/.openclaw/ops/health_reconcile.lock}"
+LOG_FILE="${HEALTH_RECON_LOGFILE:-$HOME/.openclaw/ops/health_reconcile.log}"
+ENV_FILE="${HEALTH_PIPELINE_ENV_FILE:-$HOME/.health_pipeline.env}"
+REPO_DIR="${HEALTH_REPO_DIR:-$HOME/.openclaw/workspace/health-data}"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+SCRIPT="${HEALTH_RECON_SCRIPT:-$SCRIPT_DIR/reconcile_health_ingest.py}"
 
 mkdir -p "$(dirname "$LOCK_FILE")" "$(dirname "$LOG_FILE")"
 

@@ -1,10 +1,11 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-LOCK_FILE="${HEALTH_PIPELINE_LOCKFILE:-/root/.openclaw/ops/health_pipeline.lock}"
-LOG_FILE="${HEALTH_PIPELINE_LOGFILE:-/root/.openclaw/ops/health_pipeline.log}"
-ENV_FILE="${HEALTH_PIPELINE_ENV_FILE:-/root/.health_pipeline.env}"
-SCRIPT="/root/applewatch_openclaw_pipeline/openclaw_agent/pull_and_score.sh"
+LOCK_FILE="${HEALTH_PIPELINE_LOCKFILE:-$HOME/.openclaw/ops/health_pipeline.lock}"
+LOG_FILE="${HEALTH_PIPELINE_LOGFILE:-$HOME/.openclaw/ops/health_pipeline.log}"
+ENV_FILE="${HEALTH_PIPELINE_ENV_FILE:-$HOME/.health_pipeline.env}"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+SCRIPT="${HEALTH_PIPELINE_SCRIPT:-$SCRIPT_DIR/pull_and_score.sh}"
 
 mkdir -p "$(dirname "$LOCK_FILE")" "$(dirname "$LOG_FILE")"
 

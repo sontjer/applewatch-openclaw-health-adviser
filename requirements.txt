@@ -1,0 +1,4 @@
+# This project uses Python standard library only for runtime scripts.
+# Keep this file to pin interpreter compatibility in CI/deploy docs.
+#
+# Recommended interpreter: Python >= 3.10

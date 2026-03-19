@@ -1,0 +1,11 @@
+{
+  "name": "applewatch-openclaw-health-worker",
+  "private": true,
+  "version": "1.0.0",
+  "engines": {
+    "node": ">=20"
+  },
+  "devDependencies": {
+    "wrangler": "4.74.0"
+  }
+}

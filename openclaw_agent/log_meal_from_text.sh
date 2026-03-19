@@ -2,7 +2,8 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-MEAL_LOG_SCRIPT="${MEAL_LOG_SCRIPT:-/root/codex/skills/meal-intake-log/scripts/log_meal_text.py}"
+WORKSPACE_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
+MEAL_LOG_SCRIPT="${MEAL_LOG_SCRIPT:-${MEAL_SKILL_PATH:-$WORKSPACE_ROOT/skills/meal-intake-log/scripts/log_meal_text.py}}"
 REPO_DIR="${HEALTH_REPO_DIR:-$HOME/.openclaw/workspace/health-data}"
 INPUT_TEXT="${1:-}"
 

@@ -2,14 +2,44 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
 import sys
-for p in ('/root/codex', '/root'):
-    if p not in sys.path:
-        sys.path.append(p)
+
+
+def _inject_scorer_paths() -> None:
+    script_path = Path(__file__).resolve()
+    # Prefer explicit env first; support both file-path and directory-path.
+    env = os.environ.get('SLEEP_SCORER_PATH', '').strip()
+    candidates: List[Path] = []
+    if env:
+        for raw in env.split(':'):
+            raw = raw.strip()
+            if not raw:
+                continue
+            p = Path(raw).expanduser()
+            if p.is_file():
+                candidates.append(p.parent)
+            else:
+                candidates.append(p)
+
+    # Fallbacks: codex workspace root and script directory.
+    candidates.extend(
+        [
+            script_path.parents[2],  # e.g. /root/codex
+            script_path.parent,
+        ]
+    )
+    for p in candidates:
+        ps = str(p)
+        if ps not in sys.path:
+            sys.path.append(ps)
+
+
+_inject_scorer_paths()
 from sleep_scorer_v21 import SleepScorerV21  # noqa: E402
 
 

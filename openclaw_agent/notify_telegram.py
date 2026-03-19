@@ -5,6 +5,7 @@ import html
 import json
 import os
 import urllib.parse
+import urllib.error
 import urllib.request
 import time
 from pathlib import Path
@@ -33,12 +34,24 @@ def esc(v) -> str:
 
 def post(url: str, data: dict) -> dict:
     encoded = urllib.parse.urlencode(data).encode('utf-8')
-    req = urllib.request.Request(url, data=encoded, method='POST')
     last_err = None
     for i in range(3):
+        req = urllib.request.Request(url, data=encoded, method='POST')
         try:
             with urllib.request.urlopen(req, timeout=20) as resp:
                 return json.loads(resp.read().decode('utf-8'))
+        except urllib.error.HTTPError as e:
+            last_err = e
+            retryable = e.code == 429 or 500 <= e.code < 600
+            if i < 2 and retryable:
+                retry_after = e.headers.get('Retry-After') if hasattr(e, 'headers') else None
+                try:
+                    delay = float(retry_after) if retry_after else 1.5 * (i + 1)
+                except Exception:
+                    delay = 1.5 * (i + 1)
+                time.sleep(max(0.2, delay))
+                continue
+            raise
         except Exception as e:
             last_err = e
             if i < 2:
