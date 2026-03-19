@@ -1,7 +1,6 @@
 # Apple Watch + OpenClaw Health Adviser
 
-## 🚨 最终报告效果
-初衷：
+## 初衷：
 Apple Watch 戴了用了，每天采集几百个数据点——HRV、血氧、睡眠、静息心率、步数......
 然后呢？
 打开 iPhone 健康 app，看一眼「昨晚睡了 7 小时」，关掉。
