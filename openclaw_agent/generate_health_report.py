@@ -44,6 +44,14 @@ def to_float(v: Any) -> Optional[float]:
         return None
 
 
+def pick_number(record: Dict[str, Any], *keys: str) -> Optional[float]:
+    # Preserve numeric zero: `or` treats 0 as falsy and may skip valid data.
+    for k in keys:
+        if k in record and record.get(k) is not None:
+            return to_float(record.get(k))
+    return None
+
+
 def avg(nums: List[float]) -> Optional[float]:
     return mean(nums) if nums else None
 
@@ -206,7 +214,7 @@ def select_between(series: List[Dict[str, Any]], start: datetime, end: datetime,
 def summarize_heart_rate(series: List[Dict[str, Any]]) -> Dict[str, Optional[float]]:
     mins, maxs, avgs = [], [], []
     for r in series:
-        v = to_float(r.get('qty') or r.get('value'))
+        v = pick_number(r, 'qty', 'value')
         mn = to_float(r.get('Min') or r.get('min'))
         mx = to_float(r.get('Max') or r.get('max'))
         av = to_float(r.get('Avg') or r.get('avg'))
@@ -261,7 +269,7 @@ def summarize_activity(
         out: Dict[str, float] = {}
         for r in series:
             dt = parse_dt(r.get('date') or r.get('startDate') or r.get('timestamp'))
-            v = to_float(r.get('qty') or r.get('value'))
+            v = pick_number(r, 'qty', 'value')
             if dt is None or v is None:
                 continue
             if is_kj:
@@ -428,7 +436,7 @@ def _workout_distance_km(record: Dict[str, Any]) -> Optional[float]:
         if raw is None:
             continue
         if isinstance(raw, dict):
-            v = to_float(raw.get('qty') or raw.get('value'))
+            v = pick_number(raw, 'qty', 'value')
             unit = str(raw.get('units') or raw.get('unit') or '')
         else:
             v = to_float(raw)
@@ -451,7 +459,7 @@ def _workout_active_kcal(record: Dict[str, Any]) -> Optional[float]:
         for x in record.get('activeEnergy') or []:
             if not isinstance(x, dict):
                 continue
-            q = to_float(x.get('qty') or x.get('value'))
+            q = pick_number(x, 'qty', 'value')
             if q is None:
                 continue
             unit = str(x.get('units') or x.get('unit') or '').lower()
@@ -463,7 +471,7 @@ def _workout_active_kcal(record: Dict[str, Any]) -> Optional[float]:
         return kcal if kcal > 0 else None
 
     if isinstance(raw, dict):
-        v = to_float(raw.get('qty') or raw.get('value'))
+        v = pick_number(raw, 'qty', 'value')
         unit = str(raw.get('units') or raw.get('unit') or '')
     else:
         v = to_float(raw)
@@ -481,12 +489,12 @@ def _workout_avg_hr_bpm(record: Dict[str, Any]) -> Optional[float]:
         return v
     hr = record.get('heartRate')
     if isinstance(hr, dict):
-        v = to_float(hr.get('qty') or hr.get('Avg') or hr.get('avg') or hr.get('value'))
+        v = pick_number(hr, 'qty', 'Avg', 'avg', 'value')
         if v is not None:
             return v
     data = record.get('heartRateData')
     if isinstance(data, list):
-        vals = [to_float(x.get('Avg') or x.get('avg') or x.get('qty') or x.get('value')) for x in data if isinstance(x, dict)]
+        vals = [pick_number(x, 'Avg', 'avg', 'qty', 'value') for x in data if isinstance(x, dict)]
         vals = [x for x in vals if x is not None]
         if vals:
             return avg(vals)
@@ -496,7 +504,7 @@ def _workout_avg_hr_bpm(record: Dict[str, Any]) -> Optional[float]:
 def _workout_pace_min_per_km(record: Dict[str, Any], duration_min: Optional[float], distance_km: Optional[float]) -> Optional[float]:
     sp = record.get('speed')
     if isinstance(sp, dict):
-        v = to_float(sp.get('qty') or sp.get('value'))
+        v = pick_number(sp, 'qty', 'value')
         units = str(sp.get('units') or sp.get('unit') or '').lower()
         if v is not None:
             if 'km/hr' in units or 'km/h' in units or units == 'kmhr':
@@ -1038,15 +1046,15 @@ def main() -> None:
     workout_series_30d = select_recent(workout_all_series, 30, now)
 
     hr_sum = summarize_heart_rate(hr_series)
-    rhr_vals = [to_float(r.get('qty') or r.get('value')) for r in rhr_series]
+    rhr_vals = [pick_number(r, 'qty', 'value') for r in rhr_series]
     rhr_vals = [x for x in rhr_vals if x is not None]
 
-    spo2_vals = [to_float(r.get('qty') or r.get('value')) for r in spo2_series]
+    spo2_vals = [pick_number(r, 'qty', 'value') for r in spo2_series]
     spo2_vals = [x for x in spo2_vals if x is not None]
     # normalize [0,1] to percentage
     spo2_vals = [x * 100 if x <= 1.0 else x for x in spo2_vals]
 
-    temp_vals = [to_float(r.get('qty') or r.get('value')) for r in temp_series]
+    temp_vals = [pick_number(r, 'qty', 'value') for r in temp_series]
     temp_vals = [x for x in temp_vals if x is not None]
 
     sleep_sum = summarize_sleep(sleep_series)

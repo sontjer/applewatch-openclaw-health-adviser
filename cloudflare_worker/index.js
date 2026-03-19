@@ -46,13 +46,17 @@ const METRIC_ALIASES = {
 };
 
 const CAPS = {
-  heartRate: 200,
-  stepCount: 80,
-  activeEnergyBurned: 80,
-  sleepAnalysis: 120,
-  walkingRunningDistance: 80,
-  workout: 120,
-  default: 60,
+  // Report computes daily totals by summing per-record qty for many metrics.
+  // Use high caps for additive minute-level series to avoid systemic undercount.
+  heartRate: 2000,
+  stepCount: 5000,
+  activeEnergyBurned: 5000,
+  appleExerciseTime: 2000,
+  flightsClimbed: 2000,
+  sleepAnalysis: 300,
+  walkingRunningDistance: 5000,
+  workout: 300,
+  default: 300,
 };
 
 export default {
