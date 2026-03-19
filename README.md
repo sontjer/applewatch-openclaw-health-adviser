@@ -18,7 +18,7 @@
 - iOS `Health Auto Export` 自动导出 JSON
 - Cloudflare Worker 鉴权 + 过滤 + 截断 + 入库 GitHub
 - OpenClaw Agent 定时 `git pull` 分析打分
-- 自动生成结构化健康报告（告警/趋势/饮食交叉）
+- 自动生成结构化健康报告（告警/趋势/运动/饮食交叉）
 - 自动推送 Telegram/discord/飞书等
 
 > 目标：**可读、可执行、可复盘、可扩展**。
