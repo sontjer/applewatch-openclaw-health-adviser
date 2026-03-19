@@ -1,6 +1,17 @@
 # Apple Watch + OpenClaw Health Adviser
 
 ## 🚨 最终报告效果
+初衷：
+Apple Watch 戴了用了，每天采集几百个数据点——HRV、血氧、睡眠、静息心率、步数......
+然后呢？
+打开 iPhone 健康 app，看一眼「昨晚睡了 7 小时」，关掉。
+数据采了，但没人帮你分析。
+直到我自己搭了一套「健康数据管线」——每天早上自动分析数据，推送报告到手机。
+真的，只有四个字：相见恨晚。
+🏗️ 这套系统能干嘛？
+一句话：让你的 Apple Watch 从「手环」变成「健康管家」
+📊 自动采集 | 🧠 智能分析 | 📈 趋势追踪
+🔔 自动推送 | 🍚 饮食记录 | 🚨 异常告警
 
 ![Telegram收到最终报告效果](docs/images/telegram-final-report.png)
 ![健康报告效果图2](docs/images/health-record2.jpg)
