@@ -71,6 +71,7 @@ python3 /root/applewatch-openclaw-health-adviser/openclaw_agent/print_latest_sco
 3. 睡眠窗口 + 中位数在工程上更稳健、可比性更好。
 
 详细说明见：[`docs/hrv_scoring_validation.md`](hrv_scoring_validation.md)
+评分体系全量依据见：[`docs/scoring_scientific_basis.md`](scoring_scientific_basis.md)
 
 关键参考：
 

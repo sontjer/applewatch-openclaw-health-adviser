@@ -47,6 +47,7 @@ set -a; source /root/.health_pipeline.env; set +a
 - 运行手册（部署/验收/排障）：[`docs/runbook.md`](docs/runbook.md)
 - 常见问题（错误码/修复）：[`docs/faq.md`](docs/faq.md)
 - HRV 评分口径与科学依据：[`docs/hrv_scoring_validation.md`](docs/hrv_scoring_validation.md)
+- 评分体系全量科学依据（时长/规律/时机/恢复）：[`docs/scoring_scientific_basis.md`](docs/scoring_scientific_basis.md)
 
 ---
 

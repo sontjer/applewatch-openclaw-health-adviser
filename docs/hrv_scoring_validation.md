@@ -16,6 +16,8 @@
 
 ## 参考证据
 
+> 全量评分维度依据见：`docs/scoring_scientific_basis.md`
+
 1. Task Force（ESC/NASPE）HRV 经典标准文件（1996）：强调 HRV 测量与解释需标准化场景与方法。
    - Circulation. 1996;93(5):1043-1065
    - PubMed: https://pubmed.ncbi.nlm.nih.gov/8598068/
