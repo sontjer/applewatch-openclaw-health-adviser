@@ -59,3 +59,21 @@
 python3 /root/applewatch-openclaw-health-adviser/openclaw_agent/print_latest_score.py \
   --repo-dir /root/.openclaw/workspace/health-data
 ```
+
+## Q7. 为什么 HRV 不再用“当天最新单点”或“全天均值”？
+
+当前评分已改为：**睡眠窗口 HRV 中位数**（并用近 28 天睡眠窗口中位数序列做 baseline）。
+
+原因：
+
+1. 最新单点对取样时刻极其敏感，容易被晚间训练后短时波动放大。
+2. 全天均值混入白天活动与体位变化噪声，不利于恢复状态判读。
+3. 睡眠窗口 + 中位数在工程上更稳健、可比性更好。
+
+详细说明见：[`docs/hrv_scoring_validation.md`](hrv_scoring_validation.md)
+
+关键参考：
+
+- Task Force HRV 标准（1996）：https://pubmed.ncbi.nlm.nih.gov/8598068/
+- 夜间短时 HRV 与整夜平均对比（2025）：https://pubmed.ncbi.nlm.nih.gov/39670869/
+- 夜间 HR/HRV 训练负荷监测可靠性（2022）：https://pubmed.ncbi.nlm.nih.gov/35894977/
