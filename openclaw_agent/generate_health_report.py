@@ -115,6 +115,40 @@ def get_metrics_map(latest_data: Dict[str, Any]) -> Dict[str, Any]:
     return m if isinstance(m, dict) else {}
 
 
+def pick_best_metrics_for_day(repo: Path, day_key: str, latest_metrics: Dict[str, Any]) -> Dict[str, Any]:
+    # Per-metric merge across latest + archive(day):
+    # choose the source that has the most records on target day for each metric.
+    candidates: List[Dict[str, Any]] = [latest_metrics]
+    y, m, d = day_key.split('-')
+    arc_dir = repo / 'data' / 'archive' / y / m / d
+    if arc_dir.exists():
+        for p in sorted(arc_dir.glob('*.json')):
+            try:
+                obj = load_json(p)
+            except Exception:
+                continue
+            mm = get_metrics_map(obj)
+            if mm:
+                candidates.append(mm)
+
+    metric_keys = set()
+    for mm in candidates:
+        metric_keys.update(mm.keys())
+
+    merged: Dict[str, Any] = {}
+    for key in metric_keys:
+        best_val = None
+        best_n = -1
+        for mm in candidates:
+            n = len(select_day(parse_metric_series(mm.get(key)), day_key))
+            if n > best_n:
+                best_n = n
+                best_val = mm.get(key)
+        if best_val is not None:
+            merged[key] = best_val
+    return merged
+
+
 def parse_metric_series(series: Any) -> List[Dict[str, Any]]:
     return [x for x in (series or []) if isinstance(x, dict)]
 
@@ -1010,12 +1044,18 @@ def main() -> None:
     score_meta = latest_score.get('score_meta', {})
     preview = latest_score.get('input_preview', {})
     latest_data = load_json(latest_data_path)
-    metrics_map = get_metrics_map(latest_data)
+    metrics_map_latest = get_metrics_map(latest_data)
 
     now = datetime.now().astimezone()
 
-    wake_dt = parse_dt(preview.get('wake_time', ''))
-    date_key = wake_dt.date().isoformat() if wake_dt else now.date().isoformat()
+    try:
+        day_offset = int(os.environ.get('HEALTH_REPORT_DAY_OFFSET', '1').strip() or '1')
+    except Exception:
+        day_offset = 1
+    if day_offset < 0:
+        day_offset = 0
+    date_key = (now.date() - timedelta(days=day_offset)).isoformat()
+    metrics_map = pick_best_metrics_for_day(repo, date_key, metrics_map_latest)
 
     # Daily report: strict day window only.
     hr_series = select_day(parse_metric_series(metrics_map.get('heartRate')), date_key)
