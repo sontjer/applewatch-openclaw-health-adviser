@@ -188,7 +188,7 @@ wrangler deploy
 ```bash
 HEALTH_REPO_URL=https://github.com/<you>/<data-repo>.git
 HEALTH_REPO_BRANCH=main
-HEALTH_REPO_DIR=/root/.openclaw/workspace/health-data
+HEALTH_REPO_DIR=/root/.hermes/heath-data
 HEALTH_GITHUB_PAT=<github_pat_for_private_repo>
 SLEEP_SCORER_PATH=/root/codex
 MEAL_SKILL_PATH=/root/codex/skills/meal-intake-log/scripts/log_meal_text.py
@@ -317,7 +317,7 @@ Skill 底层命令（脚本内部调用）：
 
 ```bash
 python3 /root/codex/skills/meal-intake-log/scripts/log_meal_text.py \
-  --repo-dir /root/.openclaw/workspace/health-data \
+  --repo-dir /root/.hermes/heath-data \
   --text "今天中午吃了芹菜金针菇蛋汤、青椒牛柳、红烧鲫鱼、炒生菜、一小碗米饭"
 ```
 
@@ -416,7 +416,7 @@ set -a; source /root/.health_pipeline.env; set +a; /root/applewatch-openclaw-hea
 查看最新一次评分时间戳与分数（避免手写内联 Python）：
 
 ```bash
-python3 /root/applewatch-openclaw-health-adviser/openclaw_agent/print_latest_score.py --repo-dir /root/.openclaw/workspace/health-data
+python3 /root/applewatch-openclaw-health-adviser/openclaw_agent/print_latest_score.py --repo-dir /root/.hermes/heath-data
 ```
 
 ---

@@ -3,7 +3,7 @@ set -euo pipefail
 
 REPO_URL="${HEALTH_REPO_URL:-https://github.com/<your-user>/<your-private-repo>.git}"
 GITHUB_PAT="${HEALTH_GITHUB_PAT:-}"
-REPO_DIR="${HEALTH_REPO_DIR:-$HOME/.openclaw/workspace/health-data}"
+REPO_DIR="${HEALTH_REPO_DIR:-/root/.hermes/heath-data}"
 BRANCH="${HEALTH_REPO_BRANCH:-main}"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 OPS_DIR="${HEALTH_OPS_DIR:-$HOME/.openclaw/ops}"

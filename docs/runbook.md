@@ -47,7 +47,7 @@ set -a; source /root/.health_pipeline.env; set +a
 
 # 可选：直接调用底层 skill（不推荐作为默认入口）
 python3 /root/codex/skills/meal-intake-log/scripts/log_meal_text.py \
-  --repo-dir /root/.openclaw/workspace/health-data \
+  --repo-dir /root/.hermes/heath-data \
   --text "今天中午吃了芹菜金针菇蛋汤、青椒牛柳、红烧鲫鱼、炒生菜、一小碗米饭"
 
 set -a; source /root/.health_pipeline.env; set +a

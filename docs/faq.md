@@ -57,7 +57,7 @@
 
 ```bash
 python3 /root/applewatch-openclaw-health-adviser/openclaw_agent/print_latest_score.py \
-  --repo-dir /root/.openclaw/workspace/health-data
+  --repo-dir /root/.hermes/heath-data
 ```
 
 ## Q7. 为什么 HRV 不再用“当天最新单点”或“全天均值”？

@@ -4,17 +4,17 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 WORKSPACE_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
 MEAL_LOG_SCRIPT="${MEAL_LOG_SCRIPT:-${MEAL_SKILL_PATH:-$WORKSPACE_ROOT/skills/meal-intake-log/scripts/log_meal_text.py}}"
-REPO_DIR="${HEALTH_REPO_DIR:-$HOME/.openclaw/workspace/health-data}"
+REPO_DIR="${HEALTH_REPO_DIR:-/root/.hermes/heath-data}"
 INPUT_TEXT="${1:-}"
 
 usage() {
   cat <<'EOF'
 Usage:
   log_meal_from_text.sh "记饮食：今天早上吃了一个水煮蛋、一碗芝麻糊"
-  log_meal_from_text.sh --repo-dir /root/.openclaw/workspace/health-data --text "今天中午吃了鸡胸和沙拉"
+  log_meal_from_text.sh --repo-dir /root/.hermes/heath-data --text "今天中午吃了鸡胸和沙拉"
 
 Options:
-  --repo-dir <path>   Health data repo path (default: $HEALTH_REPO_DIR or ~/.openclaw/workspace/health-data)
+  --repo-dir <path>   Health data repo path (default: $HEALTH_REPO_DIR or ~/.hermes/heath-data)
   --text <text>       Natural-language meal text
 EOF
 }
