@@ -188,6 +188,9 @@ def main() -> None:
 
     lines.append("")
     lines.append("📈 <b>趋势</b>")
+    lines.append("📖 HRV/VO2Max参考标准（通用成人范围，个体有差异）")
+    lines.append(f"• HRV（SDNN）：逐跳间隔变异幅度；大于40ms优秀 / 20-40ms正常 / 低于20ms偏弱")
+    lines.append(f"• VO2Max：心肺耐力综合指标；30岁以上男性大于35为优秀区间")
     lines.append(f"• 近7天均分: {esc(fmt(trend.get('week_avg'),1))}（较前7天 {esc(fmt(trend.get('week_delta'),1))}）")
     lines.append(f"• 近30天均分: {esc(fmt(trend.get('month_avg'),1))}（较前30天 {esc(fmt(trend.get('month_delta'),1))}）")
     if both_days is not None:
@@ -217,25 +220,17 @@ def main() -> None:
         for r in recs[:4]:
             lines.append(f"• {esc(r)}")
 
-    lines.append("")
-    lines.append("📖 <b>指标参考</b>")
-    lines.append("<pre>")
-    lines.append(row("HRV（SDNN）", "逐跳间隔变异幅度；>40ms优 / 20-40ms正常 / <20ms偏弱"))
-    lines.append(row("VO2Max", "心肺耐力综合指标；30+男性>35为优秀区间"))
-    lines.append("</pre>")
-
     text = '\n'.join(lines)
-    # escape HTML entities for Telegram HTML parse_mode (must double-encode &)
-    text = text.replace('&', '&amp;').replace('<', '&lt;').replace('>', '&gt;')
-
-    data = {
-        'chat_id': chat_id,
-        'text': text,
-        'disable_web_page_preview': 'true',
-        'parse_mode': 'HTML',
-    }
     send_url = f'https://api.telegram.org/bot{token}/sendMessage'
-    ret = post(send_url, data)
+    ret = post(
+        send_url,
+        {
+            'chat_id': chat_id,
+            'text': text,
+            'disable_web_page_preview': 'true',
+            'parse_mode': 'HTML',
+        },
+    )
     if not ret.get('ok'):
         raise SystemExit(f'telegram_send_failed: {ret}')
 
