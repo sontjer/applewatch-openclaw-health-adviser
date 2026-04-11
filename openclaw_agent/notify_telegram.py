@@ -120,6 +120,8 @@ def main() -> None:
     lines.append(row("最高心率", f"{fmt(m.get('hr_max'),1,' bpm')}" ))
     lines.append(row("血氧饱和度", f"{fmt(m.get('spo2_avg_pct'),2,' %')}" ))
     lines.append(row("手腕温度", f"{fmt(m.get('wrist_temp_avg_c'),2,' °C')}" ))
+    lines.append(row("HRV", f"{fmt(m.get('hrv'),1,' ms')}" ))
+    lines.append(row("VO2Max", f"{fmt(m.get('vo2max'),2,' mL/kg/min')}" ))
     lines.append("</pre>")
     lines.append("")
     lines.append("😴 <b>睡眠结构</b>")
@@ -215,17 +217,25 @@ def main() -> None:
         for r in recs[:4]:
             lines.append(f"• {esc(r)}")
 
+    lines.append("")
+    lines.append("📖 <b>指标参考</b>")
+    lines.append("<pre>")
+    lines.append(row("HRV（SDNN）", "逐跳间隔变异幅度；>40ms优 / 20-40ms正常 / <20ms偏弱"))
+    lines.append(row("VO2Max", "心肺耐力综合指标；30+男性>35为优秀区间"))
+    lines.append("</pre>")
+
     text = '\n'.join(lines)
+    # escape HTML entities for Telegram HTML parse_mode (must double-encode &)
+    text = text.replace('&', '&amp;').replace('<', '&lt;').replace('>', '&gt;')
+
+    data = {
+        'chat_id': chat_id,
+        'text': text,
+        'disable_web_page_preview': 'true',
+        'parse_mode': 'HTML',
+    }
     send_url = f'https://api.telegram.org/bot{token}/sendMessage'
-    ret = post(
-        send_url,
-        {
-            'chat_id': chat_id,
-            'text': text,
-            'disable_web_page_preview': 'true',
-            'parse_mode': 'HTML',
-        },
-    )
+    ret = post(send_url, data)
     if not ret.get('ok'):
         raise SystemExit(f'telegram_send_failed: {ret}')
 
