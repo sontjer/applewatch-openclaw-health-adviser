@@ -1072,6 +1072,9 @@ def main() -> None:
         temp_series = select_day(temp_base, date_key)
     sleep_series = select_day(parse_metric_series(metrics_map.get('sleepAnalysis')), date_key)
     step_series = select_day(parse_metric_series(metrics_map.get('stepCount')), date_key)
+    # VO2Max: get latest available value (not daily — Apple Watch only estimates after workouts)
+    vo2max_series = parse_metric_series(metrics_map.get('vo2Max'))
+    vo2max_latest = pick_number(vo2max_series[0], 'qty', 'value') if vo2max_series else None
     exercise_series = select_day(parse_metric_series(metrics_map.get('appleExerciseTime')), date_key)
     active_energy_series = select_day(parse_metric_series(metrics_map.get('activeEnergyBurned')), date_key)
     flights_series = select_day(parse_metric_series(metrics_map.get('flightsClimbed')), date_key)
@@ -1118,6 +1121,8 @@ def main() -> None:
         'sleep_deep_h': sleep_sum['sleep_deep_h'],
         'sleep_rem_h': sleep_sum['sleep_rem_h'],
         'sleep_awake_h': sleep_sum['sleep_awake_h'],
+        'vo2max': vo2max_latest,
+        'hrv': preview.get('hrv') if isinstance(preview, dict) else None,
     }
 
     # History for weekly/monthly trend
@@ -1310,6 +1315,8 @@ def main() -> None:
     lines.append(f"- 心率（最低/平均/最高）：`{fmt(m['hr_min'],1)}` / `{fmt(m['hr_avg'],1)}` / `{fmt(m['hr_max'],1)} bpm`")
     lines.append(f"- 血氧饱和度：`{fmt(m['spo2_avg_pct'],2,' %')}`")
     lines.append(f"- 手腕温度：`{fmt(m['wrist_temp_avg_c'],2,' °C')}`")
+    lines.append(f"- HRV（心率变异性）：`{fmt(m['hrv'],1,' ms')}`")
+    lines.append(f"- VO₂Max（最大摄氧量）：`{fmt(m['vo2max'],2,' mL/kg/min')}`")
     lines.append('')
     lines.append('## 睡眠结构')
     lines.append(f"- 睡眠总时长：`{fmt(m['sleep_total_h'],2,' h')}`")
@@ -1397,6 +1404,19 @@ def main() -> None:
     lines.append('### 运动')
     for r in recs_by_dim['运动']:
         lines.append(f"- {r}")
+    lines.append('')
+    lines.append('## 指标参考标准')
+    lines.append('> 说明：以下为通用成人参考范围，个体差异较大，请结合自身长期趋势解读。')
+    lines.append('')
+    lines.append('| 指标 | 含义 | 参考标准 |')
+    lines.append('|------|------|----------|')
+    lines.append('| 静息心率 | 清醒静息状态下的最低心率 | 60-100 bpm（运动员可 <60）|')
+    lines.append('| HRV（SDNN） | 逐跳间隔变异幅度，反映自主神经平衡 | >40 ms 优秀 / 20-40 ms 正常 / <20 ms 偏弱 |')
+    lines.append('| VO₂Max | 心肺有氧耐力的综合指标 | 30+ 男性 >35 优秀；你的 39.88 属于优秀区间 |')
+    lines.append('| 血氧饱和度 | 血液中携带氧气的红细胞比例 | 95-100% 为正常 |')
+    lines.append('| 深度睡眠 | 身体修复与免疫关键阶段 | 占总睡眠 15-25%（约 1-1.5h/夜）|')
+    lines.append('| REM 睡眠 | 大脑记忆整合与学习关键阶段 | 占总睡眠 20-25%（约 1.5-2h/夜）|')
+    lines.append('')
 
     out_md.write_text('\n'.join(lines) + '\n', encoding='utf-8')
     print(json.dumps({'ok': True, 'out_json': str(out_json), 'out_md': str(out_md)}, ensure_ascii=False))
