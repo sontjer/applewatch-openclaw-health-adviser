@@ -122,6 +122,47 @@ function fuzzyMatch(unmatchedKey, fuzzyIndex) {
 
 // ── End fuzzy matching ──────────────────────────────────────────────────
 
+// ── Telegram alert for unrecognised metric keys ─────────────────────────
+
+async function telegramAlert(env, info, reqId) {
+  const token = env.TELEGRAM_BOT_TOKEN;
+  const chatId = env.TELEGRAM_CHAT_ID;
+  if (!token || !chatId) {
+    console.log(JSON.stringify({ event: 'telegram_alert_skipped', reqId, reason: 'missing_telegram_env_vars', unmatched: info.unmatched }));
+    return;
+  }
+
+  let text = '⚠️ *Apple Health — 未知字段告警*\n\n';
+  text += 'Worker 收到以下无法识别的指标键名，请确认是否需要处理：\n';
+  for (const k of info.unmatched) {
+    text += `• \`${k}\`\n`;
+  }
+  if (info.fuzzyMapped && info.fuzzyMapped.length > 0) {
+    text += '\n*模糊自动映射*\n';
+    for (const fm of info.fuzzyMapped) {
+      text += `• \`${fm.from}\` → \`${fm.to}\` (score: ${(fm.score * 100).toFixed(0)}%)\n`;
+    }
+  }
+  text += '\n管道正常运行，未受影响。';
+
+  try {
+    await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        chat_id: chatId,
+        text,
+        parse_mode: 'Markdown',
+      }),
+    });
+    console.log(JSON.stringify({ event: 'telegram_alert_sent', reqId, unmatched: info.unmatched }));
+  } catch (e) {
+    console.log(JSON.stringify({ event: 'telegram_alert_failed', reqId, error: String(e) }));
+  }
+}
+
+// ── End Telegram alert ──────────────────────────────────────────────────
+
 export default {
   async fetch(request, env) {
     const reqId = crypto.randomUUID();
@@ -240,6 +281,18 @@ export default {
           manifestPath,
         }),
       );
+
+      // Fire Telegram alert if there are completely unrecognised keys.
+      if (filtered.unmatched_incoming_keys && filtered.unmatched_incoming_keys.length > 0) {
+        const alertInfo = {
+          unmatched: filtered.unmatched_incoming_keys,
+          fuzzyMapped: filtered.fuzzy_auto_mapped || [],
+        };
+        // Fire-and-forget — don't block the ingest response.
+        telegramAlert(env, alertInfo, reqId)
+          .catch(e => console.log(JSON.stringify({ event: 'telegram_alert_error', reqId, error: String(e) })));
+      }
+
       return json({ ok: true, summary, ingestId, latestPath, archivePath, manifestPath });
     } catch (e) {
       console.error(
