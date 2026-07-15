@@ -46,8 +46,6 @@ const METRIC_ALIASES = {
 };
 
 const CAPS = {
-  // Report computes daily totals by summing per-record qty for many metrics.
-  // Use high caps for additive minute-level series to avoid systemic undercount.
   heartRate: 2000,
   stepCount: 5000,
   activeEnergyBurned: 5000,
@@ -58,6 +56,71 @@ const CAPS = {
   workout: 300,
   default: 300,
 };
+
+// ── Auto-fuzzy-matching for unknown metric keys ──────────────────────────
+// Built once at module load. When iOS/Auto Export updates change a metric's
+// HealthKit identifier (e.g. adding an HKQuantityTypeIdentifier prefix), the
+// token overlap detector maps it to the correct known metric automatically.
+
+const FUZZY_MATCH_THRESHOLD = 0.45; // 45% token overlap to consider a match
+
+/** Split an identifier into meaningful lowercase tokens. */
+function tokenize(str) {
+  // Split on: camelCase boundaries, underscores, dots, hyphens, whitespace
+  const parts = str
+    .replace(/([a-z])([A-Z])/g, '$1 $2')     // camelCase → spaces
+    .replace(/([A-Z]+)([A-Z][a-z])/g, '$1 $2') // acronyms: "SDNN" → ok
+    .replace(/[._\-\s]+/g, ' ')                // separators → spaces
+    .toLowerCase()
+    .trim()
+    .split(/\s+/);
+  // Filter out very short junk tokens (1-2 chars that aren't meaningful)
+  return parts.filter(t => t.length >= 3 || /^(hk|ui|os)$/i.test(t));
+}
+
+/**
+ * Build a fuzzy-match index from whitelist entries + aliases.
+ * Returns a Map<canonicalName, Set<token>>.
+ */
+function buildFuzzyIndex(whitelist) {
+  const idx = new Map();
+  for (const key of whitelist) {
+    const tokens = new Set();
+    const allNames = METRIC_ALIASES[key] || [key];
+    for (const name of allNames) {
+      for (const t of tokenize(name)) tokens.add(t);
+    }
+    if (tokens.size > 0) idx.set(key, tokens);
+  }
+  return idx;
+}
+
+/**
+ * Try to fuzzy-match an unmatched key against known metrics.
+ * Returns {metric, score} or null.
+ */
+function fuzzyMatch(unmatchedKey, fuzzyIndex) {
+  const keyTokens = tokenize(unmatchedKey);
+  if (keyTokens.length === 0) return null;
+
+  let best = { metric: null, score: 0 };
+  for (const [metric, knownTokens] of fuzzyIndex) {
+    let overlap = 0;
+    for (const kt of keyTokens) {
+      if (knownTokens.has(kt)) overlap++;
+    }
+    // Also check each known token against keyTokens (bidirectional)
+    let overlap2 = 0;
+    for (const kt of knownTokens) {
+      if (keyTokens.includes(kt)) overlap2++;
+    }
+    const score = Math.max(overlap / keyTokens.length, overlap2 / Math.max(knownTokens.size, 1));
+    if (score > best.score) best = { metric, score };
+  }
+  return best.score >= FUZZY_MATCH_THRESHOLD ? best : null;
+}
+
+// ── End fuzzy matching ──────────────────────────────────────────────────
 
 export default {
   async fetch(request, env) {
@@ -210,6 +273,10 @@ function filterAndTruncate(payload, whitelist) {
   const out = { metrics: {}, original_top_level_keys: Object.keys(payload || {}) };
 
   const matchedKeys = new Set();
+  const fuzzyMatches = [];
+
+  // Build fuzzy index lazily on first use (only if there are unmatched keys)
+  let fuzzyIndex = null;
 
   for (const key of whitelist) {
     const aliases = METRIC_ALIASES[key] || [key];
@@ -231,11 +298,33 @@ function filterAndTruncate(payload, whitelist) {
     }
   }
 
-  // Record incoming keys that didn't match any whitelist entry or alias.
-  // This catches name changes from iOS HealthKit/Auto Export updates.
+  // Try fuzzy matching on any remaining unmatched keys.
   const unmatched = [...incomingKeys].filter(k => !matchedKeys.has(k));
   if (unmatched.length > 0) {
-    out.unmatched_incoming_keys = unmatched;
+    fuzzyIndex = fuzzyIndex || buildFuzzyIndex(whitelist);
+    const autoMapped = {};
+
+    for (const uk of unmatched) {
+      const match = fuzzyMatch(uk, fuzzyIndex);
+      if (match && match.metric && metricLookup[uk] != null) {
+        const val = metricLookup[uk];
+        out.metrics[match.metric] = Array.isArray(val)
+          ? stratifiedTruncate(val, CAPS[match.metric] || CAPS.default)
+          : val;
+        matchedKeys.add(uk);
+        autoMapped[uk] = match.metric;
+        fuzzyMatches.push({ from: uk, to: match.metric, score: match.score });
+      }
+    }
+
+    // Record truly unrecognised keys (after fuzzy matching)
+    const stillUnmatched = [...incomingKeys].filter(k => !matchedKeys.has(k));
+    if (stillUnmatched.length > 0) {
+      out.unmatched_incoming_keys = stillUnmatched;
+    }
+    if (fuzzyMatches.length > 0) {
+      out.fuzzy_auto_mapped = fuzzyMatches;
+    }
   }
 
   return out;
