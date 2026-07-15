@@ -206,7 +206,10 @@ function filterAndTruncate(payload, whitelist) {
   // 3) { metrics: { <metricKey>: [...] } } (already filtered shape)
   const data = payload?.data && typeof payload.data === 'object' ? payload.data : payload;
   const metricLookup = buildMetricLookup(data);
+  const incomingKeys = new Set(Object.keys(metricLookup));
   const out = { metrics: {}, original_top_level_keys: Object.keys(payload || {}) };
+
+  const matchedKeys = new Set();
 
   for (const key of whitelist) {
     const aliases = METRIC_ALIASES[key] || [key];
@@ -214,6 +217,7 @@ function filterAndTruncate(payload, whitelist) {
     for (const a of aliases) {
       if (metricLookup[a] != null) {
         val = metricLookup[a];
+        matchedKeys.add(a);
         break;
       }
     }
@@ -225,6 +229,13 @@ function filterAndTruncate(payload, whitelist) {
     } else {
       out.metrics[key] = val;
     }
+  }
+
+  // Record incoming keys that didn't match any whitelist entry or alias.
+  // This catches name changes from iOS HealthKit/Auto Export updates.
+  const unmatched = [...incomingKeys].filter(k => !matchedKeys.has(k));
+  if (unmatched.length > 0) {
+    out.unmatched_incoming_keys = unmatched;
   }
 
   return out;
