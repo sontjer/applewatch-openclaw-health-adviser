@@ -59,17 +59,34 @@ cd "$REPO_DIR"
 auth_git fetch origin "$BRANCH"
 git checkout "$BRANCH" >/dev/null 2>&1 || git checkout -b "$BRANCH" "origin/$BRANCH"
 
+# Git pull with auto-retry on transient failures (HTTP/2, network blips)
+# GitHub 瞬断（HTTP/2 stream errors）偶发，重试 3 次保证不因网络抖动中止管线
 pull_err="$(mktemp)"
-if ! auth_git pull --ff-only origin "$BRANCH" 2>"$pull_err"; then
-  if rg -q "would be overwritten by merge" "$pull_err"; then
-    backup_untracked_from_pull_error "$pull_err"
-    auth_git pull --ff-only origin "$BRANCH"
-  else
-    cat "$pull_err" >&2
-    rm -f "$pull_err"
-    exit 1
-  fi
-fi
+_retry_pull() {
+  local max_attempts=3 delay=10 attempt=1
+  while [ "$attempt" -le "$max_attempts" ]; do
+    if auth_git pull --ff-only origin "$BRANCH" 2>"$pull_err"; then
+      return 0
+    fi
+    if rg -q "would be overwritten by merge" "$pull_err"; then
+      backup_untracked_from_pull_error "$pull_err"
+      # retry after backup (no more merge conflicts expected)
+      if auth_git pull --ff-only origin "$BRANCH" 2>"$pull_err"; then
+        return 0
+      fi
+    fi
+    if [ "$attempt" -lt "$max_attempts" ]; then
+      echo "git pull failed (attempt $attempt/$max_attempts), retrying in ${delay}s..." >&2
+      cat "$pull_err" >&2
+      sleep "$delay"
+      delay=$((delay * 2))  # exponential backoff: 10s, 20s, 40s
+    fi
+    attempt=$((attempt + 1))
+  done
+  cat "$pull_err" >&2
+  return 1
+}
+_retry_pull || { rm -f "$pull_err"; exit 1; }
 rm -f "$pull_err"
 
 if [ ! -f "$REPO_DIR/data/latest.json" ]; then
