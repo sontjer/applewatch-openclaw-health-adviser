@@ -1170,6 +1170,24 @@ def main() -> None:
     if metric_summary['sleep_total_h'] is not None and metric_summary['sleep_total_h'] < 6.5:
         alerts.append('睡眠债告警：统计期平均睡眠不足 6.5 小时。')
 
+    # Stale metric detection: check when iOS last pushed each critical metric.
+    STALE_THRESHOLD_DAYS = 3
+    _critical_metrics = {
+        'appleSleepingWristTemperature': '手腕温度',
+        'heartRateVariabilitySDNN': 'HRV（心率变异性）',
+        'oxygenSaturation': '血氧饱和度',
+        'vo2Max': 'VO₂Max（最大摄氧量）',
+    }
+    _mua = latest_data.get('meta', {}).get('metric_updated_at', {})
+    for _key, _label in _critical_metrics.items():
+        _last = _mua.get(_key)
+        if _last is None:
+            alerts.append(f'数据源告警：{_label} 从未被 iOS 推送，请检查 Health Auto Export 权限。')
+        else:
+            _age = (now - datetime.fromisoformat(_last.replace('Z', '+00:00'))).days
+            if _age >= STALE_THRESHOLD_DAYS:
+                alerts.append(f'数据源告警：{_label} 已 {_age} 天未收到 iOS 推送，请检查 Health Auto Export 权限。')
+
     # Diet + cross analysis
     diet_map, diet_details_map = parse_diet(repo)
     # Strict daily mode: only use diet records on the report date.
