@@ -318,6 +318,16 @@ def summarize_activity(
     # single record → sum equals that record.
     steps_day = daily_sum(step_series)
     distance_day = daily_sum(distance_series)
+    # Guard: iPhone walkingRunningDistance uses a different unit (~12m/unit,
+    # not km).  Detect by ratio: if distance_km / steps > 0.005 km/step
+    # (≥5m/step is physically impossible for walking/running), derive from steps.
+    if steps_day:
+        STRIDE_KM = 0.0008  # 0.8 m average stride → km/step
+        THRESHOLD = 0.005   # max plausible km/step
+        for d in distance_day:
+            s = steps_day.get(d)
+            if s and s > 0 and distance_day[d] / s > THRESHOLD:
+                distance_day[d] = s * STRIDE_KM
     exercise_day = daily_sum(exercise_series)
     active_kcal_day = daily_sum(active_energy_series, is_kj=True)
     flights_day = daily_sum(flights_series)
