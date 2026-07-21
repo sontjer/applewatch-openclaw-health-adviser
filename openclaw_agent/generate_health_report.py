@@ -312,11 +312,15 @@ def summarize_activity(
             out[d] = out.get(d, 0.0) + float(v)
         return out
 
+    # stepCount & walkingRunningDistance arrive as per-interval increments
+    # (iOS Auto Export sends segment deltas, not daily totals).
+    # Summing is always correct: multiple increments → sum of parts;
+    # single record → sum equals that record.
     steps_day = daily_sum(step_series)
+    distance_day = daily_sum(distance_series)
     exercise_day = daily_sum(exercise_series)
     active_kcal_day = daily_sum(active_energy_series, is_kj=True)
     flights_day = daily_sum(flights_series)
-    distance_day = daily_sum(distance_series)
 
     def avg_day(m: Dict[str, float]) -> Optional[float]:
         return avg(list(m.values())) if m else None
@@ -1058,7 +1062,10 @@ def main() -> None:
     metrics_map = pick_best_metrics_for_day(repo, date_key, metrics_map_latest)
 
     # Daily report: strict day window only.
-    hr_series = select_day(parse_metric_series(metrics_map.get('heartRate')), date_key)
+    hr_series_all = parse_metric_series(metrics_map.get('heartRate')) or []
+    # Heart rate arrives as sparse point-in-time readings (often 1-2/day).
+    # Use 7-day window so min/max/avg are meaningful.
+    hr_series = select_recent(hr_series_all, 7, now)
     rhr_series = select_day(parse_metric_series(metrics_map.get('restingHeartRate')), date_key)
     spo2_series = select_day(parse_metric_series(metrics_map.get('oxygenSaturation')), date_key)
     # Wrist temperature is sleep-associated and often timestamped before midnight;
@@ -1349,11 +1356,11 @@ def main() -> None:
     lines.append('')
 
     lines.append('## 运动情况')
-    lines.append(f"- 步数（日均）：`{fmt(activity_sum['steps_avg'],0,' 步')}`")
-    lines.append(f"- 运动时长（日均）：`{fmt(activity_sum['exercise_min_avg'],1,' 分钟')}`")
-    lines.append(f"- 活动能量（日均）：`{fmt(activity_sum['active_kcal_avg'],1,' kcal')}`")
-    lines.append(f"- 爬楼层数（日均）：`{fmt(activity_sum['flights_avg'],1,' 层')}`")
-    lines.append(f"- 步行/跑步距离（日均）：`{fmt(activity_sum['distance_km_avg'],2,' km')}`")
+    lines.append(f"- 步数（当日）：`{fmt(activity_sum['steps_avg'],0,' 步')}`")
+    lines.append(f"- 运动时长（当日）：`{fmt(activity_sum['exercise_min_avg'],1,' 分钟')}`")
+    lines.append(f"- 活动能量（当日）：`{fmt(activity_sum['active_kcal_avg'],1,' kcal')}`")
+    lines.append(f"- 爬楼层数（当日）：`{fmt(activity_sum['flights_avg'],1,' 层')}`")
+    lines.append(f"- 步行/跑步距离（当日）：`{fmt(activity_sum['distance_km_avg'],2,' km')}`")
     lines.append('')
     lines.append('### 训练类型（当日）')
     lines.append(f"- 时长：`{fmt(workout_today.get('duration_min'),1,' 分钟')}`")
